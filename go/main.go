@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"nasotku/includes/config"
-	"nasotku/packages/chat"
+	"nasotku/packages/websocket_room"
 	"nasotku/packages/ws"
 	"net/http"
 )
@@ -12,6 +12,9 @@ import (
 func main() {
 	// инициализация конфига
 	config.Cfg = config.NewConfig()
+
+	// Инициализация менеджера вебсокет-соединений
+	websocket_room.WebsocketManager = websocket_room.NewManager()
 
 	// инициализация роутов
 
@@ -23,12 +26,9 @@ func main() {
 	// роут вебсокета (эхо-метод, что пришло, то и вернул)
 	http.HandleFunc("/go/ws/echo", ws.Echo)
 
-	// роут вебсокета (создание нового чата, хендшейк)
-	http.HandleFunc("/chat/create", chat.CreateChatHandler)
-
-	// роут вебсокета (подключение к чату, если он уже существует)
-	// передавать параметр id (отсчет с нуля)
-	http.HandleFunc("/chat/connect", chat.ConnectChatHandler)
+	// роут вебсокета (создание комнат)
+	// device - обязательный параметр GET-запроса
+	http.HandleFunc("/go/room", websocket_room.WebsocketManager.RoomHandler)
 
 	// запуск обработки запросов
 	log.Println("[APP] Start")
