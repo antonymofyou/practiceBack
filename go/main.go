@@ -4,17 +4,20 @@ import (
 	"fmt"
 	"log"
 	"nasotku/includes/config"
-	"nasotku/packages/websocket_room"
+	"nasotku/packages/webrtc_signaling"
 	"nasotku/packages/ws"
 	"net/http"
+	"sync"
 )
 
 func main() {
 	// инициализация конфига
 	config.Cfg = config.NewConfig()
 
-	// Инициализация менеджера вебсокет-соединений
-	websocket_room.WebsocketManager = websocket_room.NewManager()
+	// инициализация комнат
+	rooms := make(map[int]webrtc_signaling.ReceiveChannels)
+
+	mutex := &sync.Mutex{}
 
 	// инициализация роутов
 
@@ -27,8 +30,8 @@ func main() {
 	http.HandleFunc("/go/ws/echo", ws.Echo)
 
 	// роут вебсокета (создание комнат)
-	// device - обязательный параметр GET-запроса
-	http.HandleFunc("/go/room", websocket_room.WebsocketManager.RoomHandler)
+	// device - обязательный параметр запроса
+	http.HandleFunc("/go/room", webrtc_signaling.RoomHandler(rooms, mutex))
 
 	// запуск обработки запросов
 	log.Println("[APP] Start")
