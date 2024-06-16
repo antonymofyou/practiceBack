@@ -1,8 +1,10 @@
 package webrtc_signaling
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
+	"log"
 	"net/http"
 	"strconv"
 	"sync"
@@ -23,39 +25,48 @@ func getRoomID(device int) int {
 
 func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// МЬЮТЕКСЫ СДЕЛАТЬ
+		// получение девайса из запроса
 		userDevice, _ := strconv.Atoi(r.URL.Query().Get("device"))
-		conn, _ := upgrader.Upgrade(w, r, nil)
 		roomID := getRoomID(userDevice) // как будто ид комнаты из БД получили
-		// Добавить проверку на существование канала.
-		// закрывать канал
-		// случай, когда с 1 девайса 2+ подключения, закрыть старый, открыть новый
+		// обеспечение потокобезопасности
 		mu.Lock()
 		defer mu.Unlock()
-		if rooms[roomID] == nil {
+		// Если пользователь уже есть в комнате, не создаем новое подключение
+		if _, ok := rooms[roomID][userDevice]; ok {
+			jsonResponse, _ := json.Marshal(struct {
+				Status string `json:"status"`
+			}{"OTHER_DEVICE"})
+			if _, err := w.Write(jsonResponse); err != nil {
+				log.Println(err)
+			}
+			return
+		}
+		// Если комната на сервере еще не создана (первое подключение), создаем ее.
+		if _, ok := rooms[roomID]; !ok {
 			rooms[roomID] = make(ReceiveChannels)
 		}
+		// Установка вебсокет-соединения
+		conn, _ := upgrader.Upgrade(w, r, nil)
+		// Создания канала для доставку сообщения вебсокет-соединению
 		userChannel := make(chan []byte)
+		// Привязка канала юзера к конкретной комнате
 		rooms[roomID][userDevice] = userChannel
-		go readMessagesFromWebsocket(conn, rooms[roomID]) // from webSocket
-		go writeMessagesToWebsocket(conn, userChannel)
+
+		log.Println("Device", userDevice, "connected to room", roomID)
+
+		go readMessagesFromWebsocket(conn, rooms[roomID], userDevice, mu) // from webSocket
+		go writeMessagesToWebsocket(conn, rooms[roomID], userDevice, mu)
 	}
 }
 
-// Сделать функцию закрытия соединения и управления каналами
+func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, userDevice int, mu *sync.Mutex) {
+	// Отложенный вызов функции, закрывающей вебсокет-соединение и удаляющей юзера из комнаты.
+	defer removeDeviceFromRoom(channels, userDevice, mu, conn)
 
-func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels) {
-	defer func() {
-		err := conn.Close()
-		if err != nil {
-			return
-		}
-		// Нужно ли закрывать канал? Почитать.
-	}()
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			break // разорвано соединение, конец горутины
+			return // разорвано соединение, конец горутины
 		}
 		fmt.Println(msg)
 		for _, userChannel := range channels {
@@ -64,20 +75,43 @@ func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels) {
 	}
 }
 
-func writeMessagesToWebsocket(conn *websocket.Conn, userChannel chan []byte) {
-	defer func() {
-		err := conn.Close()
-		if err != nil {
-			return
-		}
-	}()
+func writeMessagesToWebsocket(conn *websocket.Conn, channels ReceiveChannels, userDevice int, mu *sync.Mutex) {
+	defer removeDeviceFromRoom(channels, userDevice, mu, conn)
+
+	// Потокобезопасное чтение мапы
+	mu.Lock()
+	userChannel := channels[userDevice]
+	mu.Unlock()
+
 	for {
 		select {
 		case msg, ok := <-userChannel:
 			if !ok {
 				return // разорвано соединение
 			}
-			conn.WriteMessage(websocket.TextMessage, msg)
+			if err := conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+				log.Println(err)
+			}
 		}
 	}
+}
+
+func removeDeviceFromRoom(room ReceiveChannels, userDevice int, mu *sync.Mutex, conn *websocket.Conn) {
+	// Закрываем вебсокет-соединение
+	if err := conn.Close(); err != nil {
+		// если есть ошибка, значит, функция уже отработала.
+		return
+	}
+
+	// Обеспечиваем потокобезопасность
+	mu.Lock()
+	defer mu.Unlock()
+
+	delete(room, userDevice) // удаление юзера из комнаты.
+	log.Println(userDevice, "deleted from room (disconnected)")
+}
+
+// В каком случае удаляем комнату?
+func removeRoom() {
+
 }
