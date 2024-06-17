@@ -74,15 +74,14 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 		rooms[roomID][userDevice] = userChannel
 		log.Println("Device", userDevice, "connected to room", roomID)
 
+		exitFunc := func() {
+			removeDeviceFromRoom(rooms[roomID], userDevice, mu, conn)
+			removeRoomIfNoConnections(rooms, roomID, mu)
+		}
+
 		// Запуск горутин на слушание и отправку сообщений
-		go readMessagesFromWebsocket(conn, rooms[roomID], func() {
-			removeDeviceFromRoom(rooms[roomID], userDevice, mu, conn)
-			removeRoomIfNoConnections(rooms, roomID, mu)
-		}) // from webSocket
-		go writeMessagesToWebsocket(conn, rooms[roomID][userDevice], func() {
-			removeDeviceFromRoom(rooms[roomID], userDevice, mu, conn)
-			removeRoomIfNoConnections(rooms, roomID, mu)
-		})
+		go readMessagesFromWebsocket(conn, rooms[roomID], exitFunc) // from webSocket
+		go writeMessagesToWebsocket(conn, rooms[roomID][userDevice], exitFunc)
 	}
 }
 
@@ -107,8 +106,6 @@ func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, e
 
 func writeMessagesToWebsocket(conn *websocket.Conn, userChannel chan []byte, exitFunc func()) {
 	defer exitFunc()
-
-	// Потокобезопасное чтение мапы
 
 	for {
 		select {
