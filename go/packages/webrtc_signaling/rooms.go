@@ -37,6 +37,7 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 		roomID := getRoomID(userDevice)
 		// если roomID не будет найден в БД, сделать return, вернуть response ошибку
 
+		// Тормозят ли мютексы СРАЗУ ВСЕ ПОТОКИ?
 		// обеспечение потокобезопасности
 		mu.Lock()
 		defer mu.Unlock()
@@ -66,7 +67,7 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 			return
 		}
 
-		// Создания канала для доставку сообщения вебсокет-соединению
+		// Создания канала для доставки сообщения вебсокет-соединению
 		userChannel := make(chan []byte)
 
 		// Привязка канала юзера к конкретной комнате
@@ -74,17 +75,24 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 		log.Println("Device", userDevice, "connected to room", roomID)
 
 		// Запуск горутин на слушание и отправку сообщений
-		go readMessagesFromWebsocket(conn, rooms[roomID], userDevice, mu, rooms, roomID) // from webSocket
-		go writeMessagesToWebsocket(conn, rooms[roomID], userDevice, mu, rooms, roomID)
+		go readMessagesFromWebsocket(conn, rooms[roomID], func() {
+			removeDeviceFromRoom(rooms[roomID], userDevice, mu, conn)
+			removeRoomIfNoConnections(rooms, roomID, mu)
+		}) // from webSocket
+		go writeMessagesToWebsocket(conn, rooms[roomID][userDevice], func() {
+			removeDeviceFromRoom(rooms[roomID], userDevice, mu, conn)
+			removeRoomIfNoConnections(rooms, roomID, mu)
+		})
 	}
 }
 
-func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, userDevice int, mu *sync.Mutex, rooms map[int]ReceiveChannels, roomID int) {
+func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, exitFunc func()) {
+	// Какие могут возникнуть ошибки?
+	// Как справляться с паниками?
+	// Классификации ошибок
+
 	// Отложенный вызов функции, закрывающей вебсокет-соединение и удаляющей юзера из комнаты.
-	defer func() {
-		removeDeviceFromRoom(channels, userDevice, mu, conn)
-		removeRoomIfNoConnections(rooms, roomID, mu)
-	}()
+	defer exitFunc()
 
 	for {
 		_, msg, err := conn.ReadMessage()
@@ -97,16 +105,10 @@ func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, u
 	}
 }
 
-func writeMessagesToWebsocket(conn *websocket.Conn, channels ReceiveChannels, userDevice int, mu *sync.Mutex, rooms map[int]ReceiveChannels, roomID int) {
-	defer func() {
-		removeDeviceFromRoom(channels, userDevice, mu, conn)
-		removeRoomIfNoConnections(rooms, roomID, mu)
-	}()
+func writeMessagesToWebsocket(conn *websocket.Conn, userChannel chan []byte, exitFunc func()) {
+	defer exitFunc()
 
 	// Потокобезопасное чтение мапы
-	mu.Lock()
-	userChannel := channels[userDevice]
-	mu.Unlock()
 
 	for {
 		select {
