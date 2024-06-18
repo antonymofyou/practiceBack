@@ -17,6 +17,7 @@ func main() {
 	// инициализация комнат
 	rooms := make(map[int]webrtc_signaling.ReceiveChannels)
 
+	// инициализация мьютекса
 	mutex := &sync.Mutex{}
 
 	// инициализация роутов

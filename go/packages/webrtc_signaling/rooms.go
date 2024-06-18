@@ -37,7 +37,6 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 		roomID := getRoomID(userDevice)
 		// если roomID не будет найден в БД, сделать return, вернуть response ошибку
 
-		// Тормозят ли мютексы СРАЗУ ВСЕ ПОТОКИ?
 		// обеспечение потокобезопасности
 		mu.Lock()
 		defer mu.Unlock()
@@ -87,11 +86,12 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 
 func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, exitFunc func()) {
 	// Какие могут возникнуть ошибки?
-	// Как справляться с паниками?
 	// Классификации ошибок
 
 	// Отложенный вызов функции, закрывающей вебсокет-соединение и удаляющей юзера из комнаты.
 	defer exitFunc()
+
+	defer panicHandler("readMessagesFromWebsocket")
 
 	for {
 		_, msg, err := conn.ReadMessage()
@@ -106,6 +106,8 @@ func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, e
 
 func writeMessagesToWebsocket(conn *websocket.Conn, userChannel chan []byte, exitFunc func()) {
 	defer exitFunc()
+
+	defer panicHandler("writeMessagesToWebsocket")
 
 	for {
 		select {
@@ -135,7 +137,6 @@ func removeDeviceFromRoom(room ReceiveChannels, userDevice int, mu *sync.Mutex, 
 	log.Println(userDevice, "deleted from room (disconnected)")
 }
 
-// В каком случае удаляем комнату?
 func removeRoomIfNoConnections(rooms map[int]ReceiveChannels, roomID int, mu *sync.Mutex) {
 	// Потокобезопасность
 	mu.Lock()
@@ -148,5 +149,11 @@ func removeRoomIfNoConnections(rooms map[int]ReceiveChannels, roomID int, mu *sy
 	if len(rooms[roomID]) == 0 {
 		delete(rooms, roomID)
 		log.Println("room", roomID, "was deleted (no connections)")
+	}
+}
+
+func panicHandler(place string) {
+	if err := recover(); err != nil {
+		log.Println("recover panic in", place, ":", err)
 	}
 }
