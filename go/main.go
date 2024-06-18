@@ -4,13 +4,21 @@ import (
 	"fmt"
 	"log"
 	"nasotku/includes/config"
+	"nasotku/packages/webrtc_signaling"
 	"nasotku/packages/ws"
 	"net/http"
+	"sync"
 )
 
 func main() {
 	// инициализация конфига
 	config.Cfg = config.NewConfig()
+
+	// инициализация комнат
+	rooms := make(map[int]webrtc_signaling.ReceiveChannels)
+
+	// инициализация мьютекса
+	mutex := &sync.Mutex{}
 
 	// инициализация роутов
 
@@ -21,6 +29,10 @@ func main() {
 
 	// роут вебсокета (эхо-метод, что пришло, то и вернул)
 	http.HandleFunc("/go/ws/echo", ws.Echo)
+
+	// роут вебсокета (создание комнат)
+	// device - обязательный параметр запроса
+	http.HandleFunc("/go/room", webrtc_signaling.RoomHandler(rooms, mutex))
 
 	// запуск обработки запросов
 	log.Println("[APP] Start")
