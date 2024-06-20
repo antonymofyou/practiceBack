@@ -36,6 +36,7 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 
 		// как будто комнату из БД получили
 		rd := getRoom(userDevice)
+		// TODO: Если в БД нет комнаты, возврат ошибки
 
 		// проверяем, есть ли уже такая комната в rds
 		rds.Lock()
@@ -49,14 +50,11 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 		}
 		rds.Unlock()
 
-		// Метод добавит в rds комнату, если она еще не добавлена.
-		//rds.addRoomData(rd)
-
 		// обеспечение потокобезопасности
 		mu.Lock()
 		defer mu.Unlock()
 
-		// Если пользователь уже есть в комнате, не создаем новое подключение
+		// Провека, если пользователь уже есть в комнате, не создаем новое подключение
 		if _, ok := rooms[rd.ID][userDevice]; ok {
 			jsonResponse, _ := json.Marshal(struct {
 				Status string `json:"status"`
@@ -68,7 +66,7 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 			return
 		}
 
-		// Если комната на сервере еще не создана (первое подключение), создаем ее.
+		// Проверка, Если комната на в памяти go еще не создана (первое подключение), создаем ее.
 		if _, ok := rooms[rd.ID]; !ok {
 			rooms[rd.ID] = make(ReceiveChannels)
 			log.Println("room", rd.ID, "was created")
@@ -132,10 +130,13 @@ func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, e
 		}
 
 		if string(msg) == "offer" && userDevice == rd.initiatorDevice { // Если от инициатора пришел оффер - отправляем его респондеру
-			rd.Offer = string(msg)
 			if responderChannel, ok := channels[rd.responderDevice]; ok {
+				// Не даем инициатору отправить оффер респондеру, пока респондер не подключится
+				rd.Offer = string(msg)
 				responderChannel <- []byte(rd.Offer)
 				fmt.Println(rd)
+			} else {
+				channels[rd.initiatorDevice] <- []byte("RESPONDER_NOT_CONNECTION")
 			}
 
 		} else if string(msg) == "answer" && rd.responderDevice == userDevice { // Если от респондера пришел answer - отправляем его инициатору
