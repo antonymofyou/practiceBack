@@ -32,6 +32,8 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 			return
 		}
 
+		// TODO: добавить проверку, чтобы было только 2 подключения в комнате
+
 		// как будто комнату из БД получили
 		rd := getRoom(userDevice)
 
@@ -86,9 +88,24 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 		rooms[rd.ID][userDevice] = userChannel
 		log.Println("Device", userDevice, "connected to room", rd.ID)
 
+		// Если хоть один юзер отключился, отключаем всех.
 		exitFunc := func() {
-			removeDeviceFromRoom(rooms[rd.ID], userDevice, mu, conn)
-			removeRoomIfNoConnections(rooms, rd.ID, mu)
+			// Закрытие каналов и удаление каналов из комнаты
+			mu.Lock()
+			for k, ch := range rooms[rd.ID] {
+				close(ch)
+				delete(rooms[rd.ID], k)
+			}
+			mu.Unlock()
+			removeDeviceFromRoom(userDevice, conn)      // закрываем вебсокет-подключение
+			removeRoomIfNoConnections(rooms, rd.ID, mu) // удаляется комната (каналы)
+			// Сносим roomData из rds
+			rds.Lock()
+			if _, ok := rds.rooms[rd.ID]; ok {
+				delete(rds.rooms, rd.ID)
+				log.Println("room data id", rd.ID, "was deleted")
+			}
+			rds.Unlock()
 		}
 
 		// Запуск горутин на слушание и отправку сообщений
@@ -98,24 +115,19 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 }
 
 func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, exitFunc func(), rd *roomData, userDevice int) {
-	// Какие могут возникнуть ошибки?
-	// Классификации ошибок
-
 	// Отложенный вызов функции, закрывающей вебсокет-соединение и удаляющей юзера из комнаты.
 	defer exitFunc()
 
 	defer panicHandler("readMessagesFromWebsocket")
 
-	if userDevice == rd.initiatorDevice && rd.Answer != "" { // Если текущий пользователь является инициатором и answer уже задан, отправляем answer инициатору
-		channels[userDevice] <- []byte(rd.Answer)
-		return // разрыв подключения, все данные были переданы
-	} else if userDevice == rd.responderDevice && rd.Offer != "" { // Если текущий пользователь является респондером и оффер уже задан, отправляем оффер респондеру
+	if userDevice == rd.responderDevice && rd.Offer != "" { // Если текущий пользователь является респондером и оффер уже задан, отправляем оффер респондеру
 		channels[userDevice] <- []byte(rd.Offer)
 	}
 
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
+
 			return // разорвано соединение, конец горутины
 		}
 
@@ -154,6 +166,10 @@ func writeMessagesToWebsocket(conn *websocket.Conn, userChannel chan []byte, exi
 	defer panicHandler("writeMessagesToWebsocket")
 
 	for {
+		if userDevice == rd.initiatorDevice && rd.Answer != "" { // Если текущий пользователь инициатор и ответ на его оффер уже получен, то закрываем соединение с ним
+			return
+		}
+		// В противном случае слушаем сообщения
 		select {
 		case msg, ok := <-userChannel:
 			if !ok {
@@ -161,26 +177,19 @@ func writeMessagesToWebsocket(conn *websocket.Conn, userChannel chan []byte, exi
 			}
 			if err := conn.WriteMessage(websocket.TextMessage, msg); err != nil {
 				log.Println(err)
-			}
-			if userDevice == rd.initiatorDevice && rd.Answer != "" { // Если текущий пользователь инициатор и ответ на его оффер уже получен, то закрываем соединение с ним
 				return
 			}
 		}
 	}
 }
 
-func removeDeviceFromRoom(room ReceiveChannels, userDevice int, mu *sync.Mutex, conn *websocket.Conn) {
+func removeDeviceFromRoom(userDevice int, conn *websocket.Conn) {
 	// Закрываем вебсокет-соединение
 	if err := conn.Close(); err != nil {
 		// если есть ошибка, значит, функция уже отработала.
 		return
 	}
 
-	// Обеспечиваем потокобезопасность
-	mu.Lock()
-	defer mu.Unlock()
-
-	delete(room, userDevice) // удаление юзера из комнаты.
 	log.Println(userDevice, "deleted from room (disconnected)")
 }
 

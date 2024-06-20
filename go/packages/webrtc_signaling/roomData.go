@@ -41,17 +41,3 @@ func getRoom(userDevice int) *roomData {
 		responderDevice: 2,
 	}
 }
-
-func (r *roomData) setOffer(responderChannel chan []byte) {
-	// логика для создания оффера внутри комнаты
-	r.Offer = "Offer to user"
-	responderChannel <- []byte(r.Offer)
-	log.Println("Offer created")
-}
-
-func (r *roomData) setAnswer(initiatorChannel chan []byte) {
-	// логика принятия оффера
-	r.Answer = "answer"
-	initiatorChannel <- []byte(r.Answer)
-	log.Println("Answer was sent")
-}
