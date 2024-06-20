@@ -1,8 +1,6 @@
 package webrtc_signaling
 
 import (
-	"encoding/json"
-	"fmt"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
@@ -13,7 +11,7 @@ import (
 // ключ - device юзера
 type ReceiveChannels map[int]chan []byte
 
-// хранение информации о комната (временно глобальная переменная)
+// хранение информации о комнатах (временно глобальная переменная)
 var rds = roomDataStorage{rooms: make(map[int]*roomData)}
 
 var upgrader = websocket.Upgrader{
@@ -25,30 +23,22 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 	return func(w http.ResponseWriter, r *http.Request) {
 		// получение девайса из запроса
 		userDevice, err := strconv.Atoi(r.URL.Query().Get("device"))
-
 		// Валидация девайса
 		if err != nil {
-			log.Println("no correct device", r.URL.Query().Get("device"))
+			errorJsonResponse(w, r, "INVALID_DEVICE")
 			return
 		}
 
 		// TODO: добавить проверку, чтобы было только 2 подключения в комнате
 
 		// как будто комнату из БД получили
-		rd := getRoom(userDevice)
-		// TODO: Если в БД нет комнаты, возврат ошибки
-
-		// проверяем, есть ли уже такая комната в rds
-		rds.Lock()
-		if rdPtr, ok := rds.rooms[rd.ID]; ok {
-			// если комната найдена, то даем юзерам указатель на одну и ту же комнату
-			rd = rdPtr
-		} else {
-			// если комнаты нет, создаем ее
-			rds.rooms[rd.ID] = rd
-			log.Println("created room data id", rd.ID)
+		rd, err := getRoom(userDevice)
+		if err != nil {
+			errorJsonResponse(w, r, "ERROR_DATABASE")
+			return
 		}
-		rds.Unlock()
+
+		// TODO: Если в БД нет комнаты, возврат ошибки
 
 		// обеспечение потокобезопасности
 		mu.Lock()
@@ -56,17 +46,29 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 
 		// Провека, если пользователь уже есть в комнате, не создаем новое подключение
 		if _, ok := rooms[rd.ID][userDevice]; ok {
-			jsonResponse, _ := json.Marshal(struct {
-				Status string `json:"status"`
-			}{"OTHER_DEVICE"})
-			if _, err := w.Write(jsonResponse); err != nil {
-				log.Println(err)
-			}
-			log.Println("error: OTHER_DEVICE")
+			errorJsonResponse(w, r, "OTHER_DEVICE")
 			return
 		}
 
-		// Проверка, Если комната на в памяти go еще не создана (первое подключение), создаем ее.
+		// проверяем, есть ли уже такая комната в rds
+		rds.Lock()
+		if rdPtr, ok := rds.rooms[rd.ID]; ok {
+			// если комната найдена, то даем юзерам указатель на одну и ту же комнату
+			rd = rdPtr
+			// Если комната найдена в rds, скорее всего, это подключился второй юзер. Меняем статус.
+			if rd.status == WAIT_SECOND_USER { // Проверка на всякий случай
+				rd.status = WAIT_OFFER
+			}
+		} else {
+			// если комнаты в rds нет, значит, этот юзер подключился первым и будет ждать второго
+			rd.status = WAIT_SECOND_USER
+			// добавляем комнату в rds
+			rds.rooms[rd.ID] = rd
+			log.Println("created room data id", rd.ID)
+		}
+		rds.Unlock()
+
+		// Проверка, Если комната в памяти go еще не создана (первое подключение), создаем ее.
 		if _, ok := rooms[rd.ID]; !ok {
 			rooms[rd.ID] = make(ReceiveChannels)
 			log.Println("room", rd.ID, "was created")
@@ -118,10 +120,6 @@ func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, e
 
 	defer panicHandler("readMessagesFromWebsocket")
 
-	if userDevice == rd.responderDevice && rd.Offer != "" { // Если текущий пользователь является респондером и оффер уже задан, отправляем оффер респондеру
-		channels[userDevice] <- []byte(rd.Offer)
-	}
-
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
@@ -129,28 +127,42 @@ func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, e
 			return // разорвано соединение, конец горутины
 		}
 
-		if string(msg) == "offer" && userDevice == rd.initiatorDevice { // Если от инициатора пришел оффер - отправляем его респондеру
-			if responderChannel, ok := channels[rd.responderDevice]; ok {
-				// Не даем инициатору отправить оффер респондеру, пока респондер не подключится
-				rd.Offer = string(msg)
-				responderChannel <- []byte(rd.Offer)
-				fmt.Println(rd)
-			} else {
-				channels[rd.initiatorDevice] <- []byte("RESPONDER_NOT_CONNECTION")
+		if rd.status == WAIT_OFFER {
+			if userDevice == rd.initiatorDevice {
+				if string(msg) == "offer" {
+					// Статус WAIT_OFFER, инициатор отправляет offer, верный сценарий. Смена статуса.
+					channels[rd.responderDevice] <- msg
+					rd.status = WAIT_ANSWER
+				} else if string(msg) == "answer" {
+					// Статус WAIT_OFFER, инициатор отправляет answer. Ошибка
+					channels[rd.initiatorDevice] <- []byte("INITIATOR_CANNOT_SEND_ANSWER")
+				}
+			} else if userDevice == rd.responderDevice {
+				if string(msg) == "offer" {
+					// Статус WAIT_OFFER, респондер отправляет offer. Ошибка
+					channels[rd.responderDevice] <- []byte("RESPONDER_CANNOT_SEND_OFFER")
+				} else if string(msg) == "answer" {
+					// Статус WAIT_OFFER, респондер отправляет answer. Ошибка
+					channels[rd.responderDevice] <- []byte("CANNOT_SEND_ANSWER_BEFORE_OFFER")
+				}
 			}
-
-		} else if string(msg) == "answer" && rd.responderDevice == userDevice { // Если от респондера пришел answer - отправляем его инициатору
-			if rd.Offer == "" {
-				channels[userDevice] <- []byte("OFFER_NOT_SET")
-				continue
-			}
-
-			rd.Answer = string(msg)
-
-			if initiatorChannel, ok := channels[rd.initiatorDevice]; ok {
-				initiatorChannel <- []byte(rd.Answer)
-				fmt.Println(rd)
-				return
+		} else if rd.status == WAIT_ANSWER {
+			if userDevice == rd.initiatorDevice {
+				if string(msg) == "offer" {
+					// Статус WAIT_ANSWER, инициатор отправляет offer. Ошибка
+					channels[rd.initiatorDevice] <- []byte("CANNOT_SEND_OFFER_TWICE")
+				} else if string(msg) == "answer" {
+					// Статус WAIT_ANSWER, инициатор отправляет answer. Ошибка
+					channels[rd.initiatorDevice] <- []byte("INITIATOR_CANNOT_SEND_ANSWER")
+				}
+			} else if userDevice == rd.responderDevice {
+				if string(msg) == "offer" {
+					// Статус WAIT_OFFER, респондер отправляет offer. Ошибка
+					channels[rd.responderDevice] <- []byte("RESPONDER_CANNOT_SEND_OFFER")
+				} else if string(msg) == "answer" {
+					// Статус WAIT_ANSWER, респондер отправляет answer. Верный сценария.
+					channels[rd.initiatorDevice] <- msg
+				}
 			}
 		}
 
@@ -167,10 +179,6 @@ func writeMessagesToWebsocket(conn *websocket.Conn, userChannel chan []byte, exi
 	defer panicHandler("writeMessagesToWebsocket")
 
 	for {
-		if userDevice == rd.initiatorDevice && rd.Answer != "" { // Если текущий пользователь инициатор и ответ на его оффер уже получен, то закрываем соединение с ним
-			return
-		}
-		// В противном случае слушаем сообщения
 		select {
 		case msg, ok := <-userChannel:
 			if !ok {
@@ -212,5 +220,21 @@ func removeRoomIfNoConnections(rooms map[int]ReceiveChannels, roomID int, mu *sy
 func panicHandler(place string) {
 	if err := recover(); err != nil {
 		log.Println("recover panic in", place, ":", err)
+	}
+}
+
+// Возврат JSON с ошибкой. Открытие-JSON-закрытия вебсокет-соединения.
+func errorJsonResponse(w http.ResponseWriter, r *http.Request, status string) {
+	jsonResponse := &struct {
+		Status string `json:"status"`
+	}{status}
+
+	if conn, err := upgrader.Upgrade(w, r, nil); err == nil {
+		if e := conn.WriteJSON(jsonResponse); e != nil {
+			log.Println(e)
+		}
+		if e := conn.Close(); e != nil {
+			log.Println(e)
+		}
 	}
 }
