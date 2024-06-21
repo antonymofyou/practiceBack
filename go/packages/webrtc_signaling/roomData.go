@@ -25,8 +25,7 @@ type roomData struct {
 	responderDevice                    int `sql:"responder_device"`
 	isFinishSendIceCandidatesInitiator bool
 	isFinishSendIceCandidatesResponder bool
-	// TODO: Продумать статусы, при которых меняется логика работы с офферами и ансерами.
-	status string
+	status                             string
 }
 
 // функция получения информации о комнате из БД

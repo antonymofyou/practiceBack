@@ -86,22 +86,9 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 
 		// Если хоть один юзер отключился, отключаем всех.
 		exitFunc := func() {
-			// Закрытие каналов и удаление каналов из комнаты
-			mu.Lock()
-			for k, ch := range rooms[rd.ID] {
-				close(ch)
-				delete(rooms[rd.ID], k)
-			}
-			mu.Unlock()
-			removeDeviceFromRoom(userDevice, conn)      // закрываем вебсокет-подключение
-			removeRoomIfNoConnections(rooms, rd.ID, mu) // удаляется комната (каналы)
-			// Сносим roomData из rds
-			rds.Lock()
-			if _, ok := rds.rooms[rd.ID]; ok {
-				delete(rds.rooms, rd.ID)
-				log.Println("room data id", rd.ID, "was deleted")
-			}
-			rds.Unlock()
+			// Отключился один - отключаются все. Функция корректно закрывает соединения, закрывает каналы,
+			// если они не закрыты, чити информацию из памяти go.
+			removeAllConnections(conn, rooms, mu, rd.ID, &rds)
 		}
 
 		// Запуск горутин на слушание и отправку сообщений
@@ -174,31 +161,6 @@ func writeMessagesToWebsocket(conn *websocket.Conn, userChannel chan []byte, exi
 	}
 }
 
-func removeDeviceFromRoom(userDevice int, conn *websocket.Conn) {
-	// Закрываем вебсокет-соединение
-	if err := conn.Close(); err != nil {
-		// если есть ошибка, значит, функция уже отработала.
-		return
-	}
-
-	log.Println(userDevice, "deleted from room (disconnected)")
-}
-
-func removeRoomIfNoConnections(rooms map[int]ReceiveChannels, roomID int, mu *sync.Mutex) {
-	// Потокобезопасность
-	mu.Lock()
-	defer mu.Unlock()
-	// проверка, существует ли еще эта комната
-	if _, ok := rooms[roomID]; !ok {
-		return // возврат из функции, если комната была удалена в другой горутине
-	}
-	// Удаление комнаты, если в ней больше не осталось подключенных девайсов
-	if len(rooms[roomID]) == 0 {
-		delete(rooms, roomID)
-		log.Println("room", roomID, "was deleted (no connections)")
-	}
-}
-
 func panicHandler(place string) {
 	if err := recover(); err != nil {
 		log.Println("recover panic in", place, ":", err)
@@ -218,5 +180,37 @@ func errorJsonResponse(w http.ResponseWriter, r *http.Request, status string) {
 		if e := conn.Close(); e != nil {
 			log.Println(e)
 		}
+	}
+}
+
+// Закрытие всех подключений и очистка данных о комнате
+func removeAllConnections(conn *websocket.Conn, rooms map[int]ReceiveChannels, mu *sync.Mutex, roomID int, rdStorage *roomDataStorage) {
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Если ошибка, значит, закрытие уже отработало, делаем return
+	if err := conn.Close(); err != nil {
+		return
+	}
+
+	rdStorage.Lock()
+	// Если комната есть в rds, удаляем ее
+	if _, ok := rdStorage.rooms[roomID]; ok {
+		delete(rdStorage.rooms, roomID)
+		log.Println("room data", roomID, "was deleted")
+	}
+	rdStorage.Unlock()
+
+	// делаем закрытие каналов и очистку channels в закрываемой комнате
+	// закрытие каналов триггернет всех участников удаляемой комнаты, и они закроют свои подключения
+	if userChannels, ok := rooms[roomID]; ok { // если комната еще не очищена
+		for userDevice, userChannel := range userChannels {
+			close(userChannel)
+			delete(rooms[roomID], userDevice)
+			log.Println("user", userDevice, "was disconnected")
+		}
+		delete(rooms, roomID)
+		log.Println("room", roomID, "was deleted")
 	}
 }
