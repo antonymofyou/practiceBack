@@ -7,6 +7,7 @@ import (
 	"nasotku/packages/webrtc_signaling"
 	"nasotku/packages/ws"
 	"net/http"
+	"sync"
 )
 
 func main() {
@@ -14,9 +15,9 @@ func main() {
 	config.Cfg = config.NewConfig()
 
 	// инициализация комнат
-	rooms := webrtc_signaling.RoomChannels{
-		Rooms: make(map[int]webrtc_signaling.ReceiveChannels),
-	}
+	rooms := make(map[int]webrtc_signaling.ReceiveChannels)
+
+	mutex := &sync.Mutex{}
 
 	// инициализация роутов
 

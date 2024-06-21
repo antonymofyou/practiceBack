@@ -1,7 +1,6 @@
 package webrtc_signaling
 
 import (
-	"fmt"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
@@ -10,18 +9,10 @@ import (
 )
 
 // ключ - device юзера
-type ReceiveChannels struct {
-	sync.Mutex
-	rc map[int]chan []byte
-}
-
-type RoomChannels struct {
-	sync.Mutex
-	Rooms map[int]ReceiveChannels
-}
+type ReceiveChannels map[int]chan []byte
 
 // хранение информации о комнатах (временно глобальная переменная)
-var rds = RoomDataStorage{rooms: make(map[int]*roomData)}
+var rds = roomDataStorage{rooms: make(map[int]*roomData)}
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -72,8 +63,6 @@ func RoomHandler(rooms map[int]ReceiveChannels, mu *sync.Mutex) http.HandlerFunc
 			log.Println("created room data id", rd.ID)
 		}
 		rds.Unlock()
-		fmt.Println(rds)
-		fmt.Println(rooms)
 
 		// Проверка, Если комната в памяти go еще не создана (первое подключение), создаем ее.
 		if _, ok := rooms[rd.ID]; !ok {
@@ -128,26 +117,20 @@ func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, e
 	defer panicHandler("readMessagesFromWebsocket")
 
 	// Один раз читаем мапу для получения каналов инициатора и респондера
-	mu.Lock()
-	initiatorChannel := channels[rd.initiatorDevice]
-	responderChannel := channels[rd.responderDevice]
-	mu.Unlock()
 
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			return // разорвано соединение, конец горутины
 		}
-		fmt.Println("status:", rd.status)
-		fmt.Println("role:", userDevice)
-		fmt.Println("msg:", msg)
+		mu.Lock()
 		if rd.status == WAIT_SECOND_USER {
 			if userDevice == rd.initiatorDevice && string(msg) == "offer" {
 				// Статус WAIT_SECOND_USER, попытка отправить offer. Ошибка
-				initiatorChannel <- []byte("CANNOT_SEND_OFFER_BEFORE_SECOND_USER")
+				channels[rd.initiatorDevice] <- []byte("CANNOT_SEND_OFFER_BEFORE_SECOND_USER")
 			} else if userDevice == rd.responderDevice && string(msg) == "answer" {
 				// Статус WAIT_SECOND_USER, попытка отправить answer. Ошибка
-				responderChannel <- []byte("CANNOT_SEND_ANSWER_BEFORE_SECOND_USER")
+				channels[rd.responderDevice] <- []byte("CANNOT_SEND_ANSWER_BEFORE_SECOND_USER")
 			}
 		} else if rd.status == WAIT_OFFER {
 			if userDevice == rd.initiatorDevice && string(msg) == "offer" {
@@ -156,21 +139,19 @@ func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, e
 				rd.status = WAIT_ANSWER
 			} else if userDevice == rd.responderDevice && string(msg) == "answer" {
 				// Статус WAIT_OFFER, респондер пытается отправить answer. Ошибка
-				responderChannel <- []byte("CANNOT_SEND_ANSWER_BEFORE_OFFER")
+				channels[rd.responderDevice] <- []byte("CANNOT_SEND_ANSWER_BEFORE_OFFER")
 			}
 		} else if rd.status == WAIT_ANSWER {
 			if userDevice == rd.initiatorDevice && string(msg) == "offer" {
 				// Статус WAIT_ANSWER, инициатор пытается дублировать offer. Ошибка
-				initiatorChannel <- []byte("CANNOT_SEND_OFFER_TWICE")
+				channels[rd.initiatorDevice] <- []byte("CANNOT_SEND_OFFER_TWICE")
 			} else if userDevice == rd.responderDevice && string(msg) == "answer" {
 				// Статус WAIT_ANSWER, респондер отправляет answer. Верный сценарий. Смена статуса.
-				fmt.Println("status!!:", rd.status)
-				fmt.Println("role:", userDevice)
-				fmt.Println("msg:", msg)
-				channels[rd.initiatorDevice] <- []byte("!!!!")
-				//rd.status = WAIT_ICE_CANDIDATES
+				channels[rd.initiatorDevice] <- msg
+				rd.status = WAIT_ICE_CANDIDATES
 			}
 		}
+		mu.Unlock()
 	}
 }
 
