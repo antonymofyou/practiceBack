@@ -137,7 +137,28 @@ func readMessagesFromWebsocket(conn *websocket.Conn, channels ReceiveChannels, e
 				channels[rd.initiatorDevice] <- msg
 				rd.status = WAIT_ICE_CANDIDATES
 			}
+		} else if rd.status == WAIT_ICE_CANDIDATES {
+			if userDevice == rd.initiatorDevice && string(msg) == "ice_candidates" {
+				// Инициатор отправил ic, передаем ic респондеру
+				channels[rd.responderDevice] <- msg
+			} else if userDevice == rd.responderDevice && string(msg) == "ice_candidates" {
+				// Респондер отправил ic, передаем ic инициатору
+				channels[rd.initiatorDevice] <- msg
+			} else if userDevice == rd.initiatorDevice && string(msg) == "FINISH_SEND_ICE_CANDIDATES" {
+				// Инициатор закончил отправлять ic, ставим соответствующий флаг.
+				rd.isFinishSendIceCandidatesInitiator = true
+			} else if userDevice == rd.responderDevice && string(msg) == "FINISH_SEND_ICE_CANDIDATES" {
+				// Респондер закончил отправлять ic, ставим соответствующий флаг.
+				rd.isFinishSendIceCandidatesResponder = true
+			}
+
+			if rd.isFinishSendIceCandidatesInitiator && rd.isFinishSendIceCandidatesResponder {
+				// Обмен кандидатами окончен, закрываем соединение.
+				mu.Unlock()
+				return
+			}
 		}
+		// TODO: Стоит ли ограничить отправку кандидатов после флажка финиша отправки кандидатов?
 		mu.Unlock()
 	}
 }
@@ -167,7 +188,7 @@ func panicHandler(place string) {
 	}
 }
 
-// Возврат JSON с ошибкой. Открытие-JSON-закрытия вебсокет-соединения.
+// Возврат JSON с ошибкой. Открытие-JSON-закрытие вебсокет-соединения.
 func errorJsonResponse(w http.ResponseWriter, r *http.Request, status string) {
 	jsonResponse := &struct {
 		Status string `json:"status"`
@@ -186,13 +207,13 @@ func errorJsonResponse(w http.ResponseWriter, r *http.Request, status string) {
 // Закрытие всех подключений и очистка данных о комнате
 func removeAllConnections(conn *websocket.Conn, rooms map[int]ReceiveChannels, mu *sync.Mutex, roomID int, rdStorage *roomDataStorage) {
 
-	mu.Lock()
-	defer mu.Unlock()
-
 	// Если ошибка, значит, закрытие уже отработало, делаем return
 	if err := conn.Close(); err != nil {
 		return
 	}
+
+	mu.Lock()
+	defer mu.Unlock()
 
 	rdStorage.Lock()
 	// Если комната есть в rds, удаляем ее

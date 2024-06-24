@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"nasotku/includes/config"
-	"nasotku/includes/db"
 	"nasotku/packages/webrtc_signaling"
 	"nasotku/packages/ws"
 	"net/http"
@@ -16,12 +15,12 @@ func main() {
 	config.Cfg = config.NewConfig()
 
 	// подключение к базе данных
-	var err error
+	/*var err error
 	db.Db, err = db.NewDb()
 	if err != nil {
 		log.Fatal("Не удалось подключиться к базе данных:", err.Error())
 	}
-	defer db.Db.Close()
+	defer db.Db.Close()*/
 
 	// инициализация комнат
 	rooms := make(map[int]webrtc_signaling.ReceiveChannels)

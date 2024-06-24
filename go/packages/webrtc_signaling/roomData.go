@@ -6,17 +6,22 @@ import (
 
 // Статусы для roomData
 const (
-	WAIT_SECOND_USER           = "WAIT_SECOND_USER"
-	WAIT_OFFER                 = "WAIT_OFFER"
-	WAIT_ANSWER                = "WAIT_ANSWER"
-	WAIT_ICE_CANDIDATES        = "WAIT_ICE_CANDIDATES"
-	FINISH_SEND_ICE_CANDIDATES = "FINISH_SEND_ICE_CANDIDATES"
+	WAIT_SECOND_USER    = "WAIT_SECOND_USER"
+	WAIT_OFFER          = "WAIT_OFFER"
+	WAIT_ANSWER         = "WAIT_ANSWER"
+	WAIT_ICE_CANDIDATES = "WAIT_ICE_CANDIDATES"
 )
 
 type roomDataStorage struct {
 	sync.Mutex                   // потокобезопасность для rooms
 	rooms      map[int]*roomData // ключ - id комнаты
 }
+
+// TODO: мьютексы
+/*type ReceiveChannels struct {
+	sync.Mutex
+	channels map[int]chan []byte
+}*/
 
 // Структура для хранения информации о комнате
 type roomData struct {
