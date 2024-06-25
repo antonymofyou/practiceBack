@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"nasotku/includes/config"
 	"nasotku/includes/utils"
-	"net/http"
 	"reflect"
 	"slices"
 	"sort"
@@ -93,8 +93,9 @@ func (a *API_root_class) CheckSignature(data interface{}, nasotkuToken string) b
 }
 
 // FromJson чтение запроса (r) и десериализация его в переданную структуру v
+// bytes - это байты для декодирования их по формату JSON
 // структура v здесь - это класс запроса. При успешном выполнении к значениям этого класса будут присвоены поля из запроса
-func (a *API_root_class) FromJson(r *http.Request, v interface{}) error {
+func (a *API_root_class) FromJson(bytes []byte, v interface{}) error {
 	acceptFieldsNames := utils.GetStructFieldNames(v)     // получение полей переданной структуры (если в запросе будет присутствовать что-то лишнее, чего нет в структуре v, то будет ошибка wrong object)
 	if !slices.Contains(acceptFieldsNames, "signature") { // отдельно добавляем signature, т.к. у API_Root_class.Signature стоит параметр omitempty, из-за чего, если оно пустое, то при сериализации/десерилизации пропадает)
 		acceptFieldsNames = append(acceptFieldsNames, "signature")
@@ -102,8 +103,7 @@ func (a *API_root_class) FromJson(r *http.Request, v interface{}) error {
 
 	// десериализуем тело запроса
 	var vInterface interface{}
-	defer r.Body.Close() // после завершения функции Go вызовет этот метод, дабы завершить чтение этого поля (используем именно defer, дабы если произойдет какая-то ошибка во время чтения и до этой функции выполнение просто не дойдет - она в любом случае была бы вызвана)
-	if err := json.NewDecoder(r.Body).Decode(&vInterface); err != nil {
+	if err := json.Unmarshal(bytes, &vInterface); err != nil {
 		return errors.New("error parse json 1: " + err.Error())
 	}
 	requestFields, _ := vInterface.(map[string]interface{}) // переводим распаршенную структуру в мапу
@@ -174,4 +174,19 @@ type MainResponseClass struct {
 type MainRequestClass struct {
 	API_root_class
 	Device string `json:"device"`
+}
+
+//--------------------------------Доп. функции
+
+// RequestBodyToBytes функция переводит тело запроса в байты. Она написана, дабы логику перевода в байты не писать в кадом методе API
+// body - передается из структуры http.Request (r.Body)
+func RequestBodyToBytes(body io.ReadCloser) ([]byte, error) {
+	defer body.Close()
+
+	bytes, err := io.ReadAll(body)
+	if err != nil {
+		return nil, err
+	}
+
+	return bytes, nil
 }
