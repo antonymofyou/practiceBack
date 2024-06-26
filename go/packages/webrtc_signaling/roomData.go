@@ -13,6 +13,8 @@ const (
 	WAIT_ICE_CANDIDATES = "WAIT_ICE_CANDIDATES"
 )
 
+// Мапа rooms хранит указатели на rd, так как rd - тяжелая структура, будет затратно каждый раз копировать ее
+// из функции в функцию. Тем более в горутине мы изменяем статус уже созданной rd, поэтому указатель необходим.
 type roomDataStorage struct {
 	sync.Mutex                   // потокобезопасность для rooms
 	rooms      map[int]*roomData // ключ - id комнаты
@@ -30,8 +32,8 @@ type roomData struct {
 	sync.Mutex
 	initiatorChannel                   chan []byte
 	responderChannel                   chan []byte
-	initiatorDisconnected              bool
-	responderDisconnected              bool
+	initiatorConnected                 bool
+	responderConnected                 bool
 	isFinishSendIceCandidatesInitiator bool
 	isFinishSendIceCandidatesResponder bool
 	status                             string
@@ -58,16 +60,16 @@ func (rd *roomData) closeConnections() {
 	rd.Lock()
 	defer rd.Unlock()
 
-	if !rd.initiatorDisconnected {
+	if rd.initiatorConnected {
 		// Если инициатор еще не отключен, отключаем его, ставим флажок
 		close(rd.initiatorChannel)
-		rd.initiatorDisconnected = true
+		rd.initiatorConnected = false
 		log.Println(rd.initiatorDevice, "disconnected")
 	}
-	if !rd.responderDisconnected {
+	if rd.responderConnected {
 		// Если респондер еще не отключен, отключаем его, ставим флажок
 		close(rd.responderChannel)
-		rd.responderDisconnected = true
+		rd.responderConnected = false
 		log.Println(rd.responderDevice, "disconnected")
 	}
 }

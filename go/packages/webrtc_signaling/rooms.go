@@ -8,6 +8,7 @@ import (
 )
 
 // хранение информации о комнатах (временно глобальная переменная)
+// на проде делать аллокацию для 1000+ значений.
 var rds = roomDataStorage{rooms: make(map[int]*roomData)}
 
 var upgrader = websocket.Upgrader{
@@ -17,43 +18,60 @@ var upgrader = websocket.Upgrader{
 
 func RoomHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Установка вебсокет-соединения
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
 		// получение девайса из запроса
 		userDevice, err := strconv.Atoi(r.URL.Query().Get("device"))
 		// Валидация девайса
 		if err != nil {
-			errorJsonResponse(w, r, "INVALID_DEVICE")
+			errorJsonResponse(w, r, "INVALID_DEVICE", conn)
 			return
 		}
 
 		// как будто комнату из БД получили
 		roomInfoDB, err := getRoom(userDevice)
 		if err != nil {
-			errorJsonResponse(w, r, "ERROR_DATABASE")
+			errorJsonResponse(w, r, "ERROR_DATABASE", conn)
 			return
 		}
 
 		rds.Lock()
 		defer rds.Unlock()
 
-		// TODO: OTHER_DEVICE добавить
 		// проверяем, есть ли уже такая комната в rds
 		if _, ok := rds.rooms[roomInfoDB.ID]; !ok {
 			// комнаты в rds еще нет, создаем ее.
 			rds.rooms[roomInfoDB.ID] = newRoomData(roomInfoDB)
 			// если комнаты в rds нет, значит, этот юзер подключился первым и будет ждать второго
 			rds.rooms[roomInfoDB.ID].status = WAIT_SECOND_USER
-			log.Println("created room data id", rds.rooms[roomInfoDB.ID])
+			log.Println("created room data id", roomInfoDB.ID)
 		} else {
-			// Если комната найдена в rds, это подключился второй юзер. Меняем статус.
+			// Если комната уже создана и идет попытка сделать OTHER_DEVICE (сделлать второе подключение с одного девайса)
+			if userDevice == roomInfoDB.initiatorDevice && rds.rooms[roomInfoDB.ID].initiatorConnected ||
+				userDevice == roomInfoDB.responderDevice && rds.rooms[roomInfoDB.ID].responderConnected {
+				errorJsonResponse(w, r, "OTHER_DEVICE", conn) // функция отправит ошибку и закроет conn
+				return
+			}
+			// Если комната найдена в rds и это не OTHER_DEVICE, значит подключился второй юзер. Меняем статус.
 			rds.rooms[roomInfoDB.ID].status = WAIT_OFFER
 		}
 
-		// Установка вебсокет-соединения
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Println(err)
-			//TODO: добавить removeAllConnections? Это случай, когда какой-то юзер не смог подключиться, но один уже есть в памяти ГО
-			return
+		// Ставим соответствующий флажок, что подключился либо инициатор либо респондер и заодно определяем,
+		// с каким каналом передать conn в горутину
+		var userChannel chan []byte = nil
+		if userDevice == roomInfoDB.initiatorDevice {
+			rds.rooms[roomInfoDB.ID].initiatorConnected = true
+			userChannel = rds.rooms[roomInfoDB.ID].initiatorChannel
+			log.Println("initiator ID", roomInfoDB.initiatorDevice, "connected")
+		} else if userDevice == roomInfoDB.responderDevice {
+			rds.rooms[roomInfoDB.ID].responderConnected = true
+			userChannel = rds.rooms[roomInfoDB.ID].responderChannel
+			log.Println("responder ID", roomInfoDB.responderDevice, "connected")
 		}
 
 		// Если хоть один юзер отключился, отключаем всех.
@@ -61,14 +79,6 @@ func RoomHandler() http.HandlerFunc {
 			// Отключился один - отключаются все. Функция корректно закрывает соединения, закрывает каналы,
 			// если они не закрыты, чистит информацию из памяти go.
 			removeAllConnections(conn, roomInfoDB.ID, &rds, rds.rooms[roomInfoDB.ID])
-		}
-
-		// Определяем, к какому каналу (инициатор или респондер) нужно привязать conn.
-		var userChannel chan []byte = nil
-		if userDevice == roomInfoDB.initiatorDevice {
-			userChannel = rds.rooms[roomInfoDB.ID].initiatorChannel
-		} else if userDevice == roomInfoDB.responderDevice {
-			userChannel = rds.rooms[roomInfoDB.ID].responderChannel
 		}
 
 		// Запуск горутин на слушание и отправку сообщений
@@ -82,8 +92,6 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, userDevice in
 	defer exitFunc()
 
 	defer panicHandler("readMessagesFromWebsocket")
-
-	// Один раз читаем мапу для получения каналов инициатора и респондера
 
 	for {
 		_, msg, err := conn.ReadMessage()
@@ -170,19 +178,17 @@ func panicHandler(place string) {
 	}
 }
 
-// Возврат JSON с ошибкой. Открытие-JSON-закрытие вебсокет-соединения.
-func errorJsonResponse(w http.ResponseWriter, r *http.Request, status string) {
+// Отправка ошибки в виде Json и закрытие вебсокет-подключения.
+func errorJsonResponse(w http.ResponseWriter, r *http.Request, status string, conn *websocket.Conn) {
 	jsonResponse := &struct {
 		Status string `json:"status"`
 	}{status}
 
-	if conn, err := upgrader.Upgrade(w, r, nil); err == nil {
-		if e := conn.WriteJSON(jsonResponse); e != nil {
-			log.Println(e)
-		}
-		if e := conn.Close(); e != nil {
-			log.Println(e)
-		}
+	if err := conn.WriteJSON(jsonResponse); err != nil {
+		log.Println(err)
+	}
+	if err := conn.Close(); err != nil {
+		log.Println(err)
 	}
 }
 
