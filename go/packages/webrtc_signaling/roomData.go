@@ -21,9 +21,9 @@ type roomDataStorage struct {
 }
 
 type roomInfoFromDB struct {
-	ID              int `sql:"room_id"`
-	initiatorDevice int `sql:"initiator_device"`
-	responderDevice int `sql:"responder_device"`
+	ID              int    `sql:"room_id"`
+	initiatorDevice string `sql:"initiator_device"`
+	responderDevice string `sql:"responder_device"`
 }
 
 // Структура для хранения информации о комнате
@@ -40,11 +40,11 @@ type roomData struct {
 }
 
 // функция получения информации о комнате из БД
-func getRoom(userDevice int) (*roomInfoFromDB, error) {
+func getRoom(userDevice string) (*roomInfoFromDB, error) {
 	return &roomInfoFromDB{
 		ID:              1,
-		initiatorDevice: 1,
-		responderDevice: 2,
+		initiatorDevice: "1",
+		responderDevice: "2",
 	}, nil
 }
 
@@ -56,6 +56,7 @@ func newRoomData(roomInfo *roomInfoFromDB) *roomData {
 	}
 }
 
+// TODO: закомментировать новые функции
 func (rd *roomData) closeConnections() {
 	rd.Lock()
 	defer rd.Unlock()

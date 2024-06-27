@@ -108,6 +108,11 @@ func (a *API_root_class) FromJson(bytes []byte, v interface{}) error {
 	}
 	requestFields, _ := vInterface.(map[string]interface{}) // переводим распаршенную структуру в мапу
 
+	// проверка наличия подписи
+	if _, ok := requestFields["signature"]; !ok {
+		return errors.New("haven't set signature")
+	}
+
 	// валидация запроса (нет ли там лишних полей)
 	for key, _ := range requestFields {
 		if !slices.Contains(acceptFieldsNames, key) { // если в запросе есть поле, которого нет в переданном классе запроса - возвращаем ошибку

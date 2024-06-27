@@ -3,9 +3,26 @@ package webrtc_signaling
 import (
 	"github.com/gorilla/websocket"
 	"log"
+	"nasotku/includes/api_root_classes"
 	"net/http"
-	"strconv"
 )
+
+type WebrtcSignalingOfferRequest struct {
+	api_root_classes.MainRequestClass
+	Offer string `json:"offer"`
+}
+
+type WebrtcSignalingOfferResponse struct {
+	api_root_classes.MainResponseClass
+	Offer string `json:"offer"`
+}
+
+/*
+* Принимать ic в статусах wait_offer, wait_answer, wait_ice_candidates.
+* Добавить возможность ставить флаги окончания отправки ic в этих статусах.
+*
+* Переименовать статус wait_ice_candidates в FINISH_RECEIVE_DATA (?) (окончание отправки offer/answer).
+ */
 
 // хранение информации о комнатах (временно глобальная переменная)
 // на проде делать аллокацию для 1000+ значений.
@@ -18,6 +35,9 @@ var upgrader = websocket.Upgrader{
 
 func RoomHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		in := &api_root_classes.MainRequestClass{}
+		out := &api_root_classes.MainResponseClass{}
+
 		// Установка вебсокет-соединения
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -25,18 +45,22 @@ func RoomHandler() http.HandlerFunc {
 			return
 		}
 
-		// получение девайса из запроса
-		userDevice, err := strconv.Atoi(r.URL.Query().Get("device"))
-		// Валидация девайса
-		if err != nil {
-			errorJsonResponse(w, r, "INVALID_DEVICE", conn)
+		if err := in.FromJson([]byte(r.URL.Query().Get("data")), &in); err != nil {
+			errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse))
 			return
 		}
 
+		//--------------------------------Проверка пользователя
+		/*if err := auth.CheckUser(in, in); err != nil {
+			errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), err.Success))
+			return
+		}*/
+
+		// TODO: userDeivce теперь string везде!
 		// как будто комнату из БД получили
-		roomInfoDB, err := getRoom(userDevice)
+		roomInfoDB, err := getRoom(in.Device)
 		if err != nil {
-			errorJsonResponse(w, r, "ERROR_DATABASE", conn)
+			errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse))
 			return
 		}
 
@@ -52,9 +76,10 @@ func RoomHandler() http.HandlerFunc {
 			log.Println("created room data id", roomInfoDB.ID)
 		} else {
 			// Если комната уже создана и идет попытка сделать OTHER_DEVICE (сделлать второе подключение с одного девайса)
-			if userDevice == roomInfoDB.initiatorDevice && rds.rooms[roomInfoDB.ID].initiatorConnected ||
-				userDevice == roomInfoDB.responderDevice && rds.rooms[roomInfoDB.ID].responderConnected {
-				errorJsonResponse(w, r, "OTHER_DEVICE", conn) // функция отправит ошибку и закроет conn
+			if (in.Device == roomInfoDB.initiatorDevice && rds.rooms[roomInfoDB.ID].initiatorConnected) ||
+				(in.Device == roomInfoDB.responderDevice && rds.rooms[roomInfoDB.ID].responderConnected) {
+				// функция отправит ошибку и закроет conn
+				errorJsonResponse(conn, out.MakeWrongResponse("OTHER_DEVICE", api_root_classes.ErrorResponse))
 				return
 			}
 			// Если комната найдена в rds и это не OTHER_DEVICE, значит подключился второй юзер. Меняем статус.
@@ -64,11 +89,11 @@ func RoomHandler() http.HandlerFunc {
 		// Ставим соответствующий флажок, что подключился либо инициатор либо респондер и заодно определяем,
 		// с каким каналом передать conn в горутину
 		var userChannel chan []byte = nil
-		if userDevice == roomInfoDB.initiatorDevice {
+		if in.Device == roomInfoDB.initiatorDevice {
 			rds.rooms[roomInfoDB.ID].initiatorConnected = true
 			userChannel = rds.rooms[roomInfoDB.ID].initiatorChannel
 			log.Println("initiator ID", roomInfoDB.initiatorDevice, "connected")
-		} else if userDevice == roomInfoDB.responderDevice {
+		} else if in.Device == roomInfoDB.responderDevice {
 			rds.rooms[roomInfoDB.ID].responderConnected = true
 			userChannel = rds.rooms[roomInfoDB.ID].responderChannel
 			log.Println("responder ID", roomInfoDB.responderDevice, "connected")
@@ -82,12 +107,12 @@ func RoomHandler() http.HandlerFunc {
 		}
 
 		// Запуск горутин на слушание и отправку сообщений
-		go readMessagesFromWebsocket(conn, rds.rooms[roomInfoDB.ID], userDevice, exitFunc) // from webSocket
+		go readMessagesFromWebsocket(conn, rds.rooms[roomInfoDB.ID], in.Device, exitFunc) // from webSocket
 		go writeMessagesToWebsocket(conn, userChannel, exitFunc)
 	}
 }
 
-func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, userDevice int, exitFunc func()) {
+func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string, exitFunc func()) {
 	// Отложенный вызов функции, закрывающей вебсокет-соединение и удаляющей юзера из комнаты.
 	defer exitFunc()
 
@@ -102,42 +127,70 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, userDevice in
 		rd.Lock()
 
 		if rd.status == WAIT_SECOND_USER {
-			if userDevice == rd.initiatorDevice && string(msg) == "offer" {
+			if device == rd.initiatorDevice && string(msg) == "offer" {
 				// Статус WAIT_SECOND_USER, попытка отправить offer. Ошибка
 				rd.initiatorChannel <- []byte("CANNOT_SEND_OFFER_BEFORE_SECOND_USER")
-			} else if userDevice == rd.responderDevice && string(msg) == "answer" {
+			} else if device == rd.responderDevice && string(msg) == "answer" {
 				// Статус WAIT_SECOND_USER, попытка отправить answer. Ошибка
 				rd.responderChannel <- []byte("CANNOT_SEND_ANSWER_BEFORE_SECOND_USER")
+			} else {
+				if device == rd.initiatorDevice {
+					rd.initiatorChannel <- []byte("Пришли некорректные данные для текущего статуса")
+				}
 			}
 		} else if rd.status == WAIT_OFFER {
-			if userDevice == rd.initiatorDevice && string(msg) == "offer" {
-				// Статус WAIT_OFFER, инициатор отправляет offer, верный сценарий. Смена статуса.
-				rd.responderChannel <- msg
+			if device == rd.initiatorDevice {
+				//--------------------------------Статус WAIT_OFFER, инициатор отправляет offer
+				in := &WebrtcSignalingOfferRequest{}
+				out := &WebrtcSignalingOfferResponse{}
+
+				if err := in.FromJson(msg, &in); err != nil {
+					rd.initiatorChannel <- out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse)
+					rd.Unlock()
+					continue
+				}
+
+				//--------------------------------Проверка пользователя
+				/*if err := auth.CheckUser(in.MainRequestClass, in); err != nil {
+					rd.initiatorChannel <- out.MakeWrongResponse(err.Error(), err.Success)
+					rd.Unlock()
+					continue
+				}*/
+
+				//--------------------------------Валидация in.Offer
+				if in.Offer == "" {
+					rd.initiatorChannel <- out.MakeWrongResponse("Параметр 'offer' отсутствует или задан некорректно", api_root_classes.ErrorResponse)
+					rd.Unlock()
+					continue
+				}
+
+				out.Offer = in.Offer
+				rd.responderChannel <- out.MakeResponse(out, "")
 				rd.status = WAIT_ANSWER
-			} else if userDevice == rd.responderDevice && string(msg) == "answer" {
+			} else if device == rd.responderDevice {
 				// Статус WAIT_OFFER, респондер пытается отправить answer. Ошибка
 				rd.responderChannel <- []byte("CANNOT_SEND_ANSWER_BEFORE_OFFER")
 			}
 		} else if rd.status == WAIT_ANSWER {
-			if userDevice == rd.initiatorDevice && string(msg) == "offer" {
+			if device == rd.initiatorDevice && string(msg) == "offer" {
 				// Статус WAIT_ANSWER, инициатор пытается дублировать offer. Ошибка
 				rd.initiatorChannel <- []byte("CANNOT_SEND_OFFER_TWICE")
-			} else if userDevice == rd.responderDevice && string(msg) == "answer" {
+			} else if device == rd.responderDevice && string(msg) == "answer" {
 				// Статус WAIT_ANSWER, респондер отправляет answer. Верный сценарий. Смена статуса.
 				rd.initiatorChannel <- msg
 				rd.status = WAIT_ICE_CANDIDATES
 			}
 		} else if rd.status == WAIT_ICE_CANDIDATES {
-			if userDevice == rd.initiatorDevice && string(msg) == "ice_candidates" {
+			if device == rd.initiatorDevice && string(msg) == "ice_candidates" {
 				// Инициатор отправил ic, передаем ic респондеру
 				rd.responderChannel <- msg
-			} else if userDevice == rd.responderDevice && string(msg) == "ice_candidates" {
+			} else if device == rd.responderDevice && string(msg) == "ice_candidates" {
 				// Респондер отправил ic, передаем ic инициатору
 				rd.initiatorChannel <- msg
-			} else if userDevice == rd.initiatorDevice && string(msg) == "FINISH_SEND_ICE_CANDIDATES" {
+			} else if device == rd.initiatorDevice && string(msg) == "FINISH_SEND_ICE_CANDIDATES" {
 				// Инициатор закончил отправлять ic, ставим соответствующий флаг.
 				rd.isFinishSendIceCandidatesInitiator = true
-			} else if userDevice == rd.responderDevice && string(msg) == "FINISH_SEND_ICE_CANDIDATES" {
+			} else if device == rd.responderDevice && string(msg) == "FINISH_SEND_ICE_CANDIDATES" {
 				// Респондер закончил отправлять ic, ставим соответствующий флаг.
 				rd.isFinishSendIceCandidatesResponder = true
 			}
@@ -148,7 +201,7 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, userDevice in
 				return
 			}
 		}
-		// TODO: Стоит ли ограничить отправку кандидатов после флажка финиша отправки кандидатов?
+		// TODO: Стоит ли ограничить отправку кандидатов после флажка финиша отправки кандидатов? (Да, запретить)
 		rd.Unlock()
 	}
 }
@@ -179,12 +232,8 @@ func panicHandler(place string) {
 }
 
 // Отправка ошибки в виде Json и закрытие вебсокет-подключения.
-func errorJsonResponse(w http.ResponseWriter, r *http.Request, status string, conn *websocket.Conn) {
-	jsonResponse := &struct {
-		Status string `json:"status"`
-	}{status}
-
-	if err := conn.WriteJSON(jsonResponse); err != nil {
+func errorJsonResponse(conn *websocket.Conn, errorResponse []byte) {
+	if err := conn.WriteMessage(websocket.TextMessage, errorResponse); err != nil {
 		log.Println(err)
 	}
 	if err := conn.Close(); err != nil {
