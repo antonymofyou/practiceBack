@@ -7,16 +7,6 @@ import (
 	"net/http"
 )
 
-type WebrtcSignalingOfferRequest struct {
-	api_root_classes.MainRequestClass
-	Offer string `json:"offer"`
-}
-
-type WebrtcSignalingOfferResponse struct {
-	api_root_classes.MainResponseClass
-	Offer string `json:"offer"`
-}
-
 /*
 * Принимать ic в статусах wait_offer, wait_answer, wait_ice_candidates.
 * Добавить возможность ставить флаги окончания отправки ic в этих статусах.
@@ -56,7 +46,6 @@ func RoomHandler() http.HandlerFunc {
 			return
 		}*/
 
-		// TODO: userDeivce теперь string везде!
 		// как будто комнату из БД получили
 		roomInfoDB, err := getRoom(in.Device)
 		if err != nil {
@@ -124,52 +113,62 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string
 			return // разорвано соединение, конец горутины
 		}
 		// TODO: добавить проверку, не закрыты ли каналы
+
 		rd.Lock()
 
 		if rd.status == WAIT_SECOND_USER {
-			if device == rd.initiatorDevice && string(msg) == "offer" {
-				// Статус WAIT_SECOND_USER, попытка отправить offer. Ошибка
-				rd.initiatorChannel <- []byte("CANNOT_SEND_OFFER_BEFORE_SECOND_USER")
-			} else if device == rd.responderDevice && string(msg) == "answer" {
-				// Статус WAIT_SECOND_USER, попытка отправить answer. Ошибка
-				rd.responderChannel <- []byte("CANNOT_SEND_ANSWER_BEFORE_SECOND_USER")
-			} else {
-				if device == rd.initiatorDevice {
-					rd.initiatorChannel <- []byte("Пришли некорректные данные для текущего статуса")
-				}
+			// Отправка ошибки, когда кто-то из пользователей пытается отправить данные до подключения другого пользователя
+			out := &api_root_classes.MainResponseClass{}
+			errMsg := out.MakeWrongResponse("Ожидание второго пользователя. Обмен данными невозможен", api_root_classes.ErrorResponse)
+			if device == rd.initiatorDevice {
+				rd.initiatorChannel <- errMsg
+			} else if device == rd.responderDevice {
+				rd.responderChannel <- errMsg
 			}
 		} else if rd.status == WAIT_OFFER {
+
+			in := &WebrtcSignalingRequest{}
+			out := &WebrtcSignalingResponse{}
+
+			var userChannel chan []byte
 			if device == rd.initiatorDevice {
+				userChannel = rd.initiatorChannel
+			} else if device == rd.responderDevice {
+				userChannel = rd.responderChannel
+			}
+
+			// Распаршиваем пришедший json
+			if err := in.FromJson(msg, &in); err != nil {
+				userChannel <- out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse)
+				rd.Unlock()
+				continue
+			}
+			// Валидируем поле Data
+			if in.Data == "" {
+				userChannel <- out.MakeWrongResponse("Параметр 'data' отсутствует или задан некорректно", api_root_classes.ErrorResponse)
+				rd.Unlock()
+				continue
+			}
+
+			//--------------------------------Проверка пользователя
+			/*if err := auth.CheckUser(in.MainRequestClass, in); err != nil {
+				rd.initiatorChannel <- out.MakeWrongResponse(err.Error(), err.Success)
+				rd.Unlock()
+				continue
+			}*/
+			if device == rd.initiatorDevice && in.DataType == DATA_TYPE_OFFER {
 				//--------------------------------Статус WAIT_OFFER, инициатор отправляет offer
-				in := &WebrtcSignalingOfferRequest{}
-				out := &WebrtcSignalingOfferResponse{}
-
-				if err := in.FromJson(msg, &in); err != nil {
-					rd.initiatorChannel <- out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse)
-					rd.Unlock()
-					continue
-				}
-
-				//--------------------------------Проверка пользователя
-				/*if err := auth.CheckUser(in.MainRequestClass, in); err != nil {
-					rd.initiatorChannel <- out.MakeWrongResponse(err.Error(), err.Success)
-					rd.Unlock()
-					continue
-				}*/
-
-				//--------------------------------Валидация in.Offer
-				if in.Offer == "" {
-					rd.initiatorChannel <- out.MakeWrongResponse("Параметр 'offer' отсутствует или задан некорректно", api_root_classes.ErrorResponse)
-					rd.Unlock()
-					continue
-				}
-
-				out.Offer = in.Offer
+				//--------------------------------Валидация in.Data
+				// Отправляем оффер респондеру
+				out.Data = in.Data
 				rd.responderChannel <- out.MakeResponse(out, "")
 				rd.status = WAIT_ANSWER
-			} else if device == rd.responderDevice {
-				// Статус WAIT_OFFER, респондер пытается отправить answer. Ошибка
-				rd.responderChannel <- []byte("CANNOT_SEND_ANSWER_BEFORE_OFFER")
+			} else if in.DataType == DATA_TYPE_ICE_CANDIDATES {
+
+				// Инициатор отправляет ic
+				if device == rd.initiatorDevice {
+
+				}
 			}
 		} else if rd.status == WAIT_ANSWER {
 			if device == rd.initiatorDevice && string(msg) == "offer" {
