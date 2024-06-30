@@ -1,8 +1,5 @@
 <?php
 
-const APP_SECRET_KEY_INT = '';
-const APP_SECRET_KEY_STRING = '';
-
 // Основные классы для API
 class API_root_class
 {
@@ -96,14 +93,14 @@ class API_root_class
     }
 }
 
-//Основной класс запросов клиента
+// Основной класс запросов клиента
 class MainRequestClass extends API_root_class
 {
     public $device = '';
 }
 
 
-//Основной класс ответов клиенту
+// Основной класс ответов клиенту
 class MainResponseClass extends \API_root_class
 {
     public $success = '';
