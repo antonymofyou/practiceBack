@@ -27,13 +27,6 @@ class Database
             PDO::ATTR_EMULATE_PREPARES => false,
         ];
 
-        try {
-            $this->pdo = new PDO($this->dsn, $this->user, $this->password, $this->opt);
-        } catch (Exception $ex) {
-            // $this->logger->new('ERROR', 'DATABASE', 'Failed to connect to database ' . str_replace("\n", "_", $ex));
-            return false;
-        }
-
-        return $this;
+        $this->pdo = new PDO($this->dsn, $this->user, $this->password, $this->opt);
     }
 }
