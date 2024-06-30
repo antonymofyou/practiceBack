@@ -123,9 +123,8 @@ try {
 try {
     $stmt = $db->pdo->prepare($sql);
     $stmt->execute($whereData);
-    $out->users = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $out->success = 1;
-    $out->message = 'Список пользователей успешно получен.';
+    $out->users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $ex) {
     echo $sql;
     $out->make_wrong_resp('Произошла ошибка при выполнении запроса.', 0);
