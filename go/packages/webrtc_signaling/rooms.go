@@ -124,105 +124,85 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string
 
 		rd.Lock()
 
-		if rd.status == WAIT_SECOND_USER {
-			// Отправка ошибки, когда кто-то из пользователей пытается отправить данные до подключения другого пользователя
-			out := &api_root_classes.MainResponseClass{}
-			userChannel <- out.MakeWrongResponse("Ожидание второго пользователя. Обмен данными невозможен", api_root_classes.ErrorResponse)
-		} else if rd.status == WAIT_OFFER && device == rd.initiatorDevice {
-			//--------------------------------Статус WAIT_OFFER, инициатор отправляет offer
+		in := &WebrtcSignalingRequest{}
+		out := &WebrtcSignalingResponse{}
 
-			in := &WebrtcSignalingRequest{}
-			out := &WebrtcSignalingResponse{}
-
-			// Распаршиваем пришедший json
-			if err := in.FromJson(msg, &in); err != nil {
-				userChannel <- out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse)
-				rd.Unlock()
-				continue
-			}
-
-			// если тип сообщения это offer или ic - передаем респондеру
-			if in.DataType == DATA_TYPE_OFFER || in.DataType == DATA_TYPE_ICE_CANDIDATES {
-				out.DataType = in.DataType
-				out.Data = in.Data
-				rd.responderChannel <- out.MakeResponse(out, "")
-
-				// если тип сообщения это offer - меняем статус на WAIT_ANSWER
-				if in.DataType == DATA_TYPE_OFFER {
-					rd.status = WAIT_ANSWER
-				}
-			} else { // если ни один из типов данных сейчас не разрешен
-				userChannel <- out.MakeWrongResponse("Сейчас нельзя отправить эти данные", api_root_classes.ErrorResponse)
-			}
-		} else if rd.status == WAIT_ANSWER && device == rd.responderDevice {
-			//--------------------------------Статус WAIT_ANSWER, респондер отправляет answer
-
-			in := &WebrtcSignalingRequest{}
-			out := &WebrtcSignalingResponse{}
-
-			// Распаршиваем пришедший json
-			if err := in.FromJson(msg, &in); err != nil {
-				userChannel <- out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse)
-				rd.Unlock()
-				continue
-			}
-
-			// если тип сообщения это answer или ic - передаем инициатору
-			if in.DataType == DATA_TYPE_ANSWER || in.DataType == DATA_TYPE_ICE_CANDIDATES {
-				out.DataType = in.DataType
-				out.Data = in.Data
-				rd.initiatorChannel <- out.MakeResponse(out, "")
-
-				// если тип сообщения это answer - меняем статус на FINISH_RECEIVE_DATA
-				if in.DataType == DATA_TYPE_ANSWER {
-					rd.status = FINISH_RECEIVE_DATA
-				}
-			} else { // если ни один из типов данных сейчас не разрешен
-				userChannel <- out.MakeWrongResponse("Сейчас нельзя отправить эти данные", api_root_classes.ErrorResponse)
-			}
-		} else if rd.status == FINISH_RECEIVE_DATA {
-			//--------------------------------Статус FINISH_RECEIVE_DATA, пользователи обмениваются ic
-
-			in := &WebrtcSignalingRequest{}
-			out := &WebrtcSignalingResponse{}
-
-			// Распаршиваем пришедший json
-			if err := in.FromJson(msg, &in); err != nil {
-				userChannel <- out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse)
-				rd.Unlock()
-				continue
-			}
-
-			if in.DataType == DATA_TYPE_ICE_CANDIDATES { // пришел ic
-				out.DataType = in.DataType
-				out.Data = in.Data
-				message := out.MakeResponse(out, "")
-
-				// отправляем ic пользователю, противоположному текущему (в случае, если текущий пользователь еще не закончил отправку ic)
-				if device == rd.initiatorDevice && !rd.isFinishSendIceCandidatesInitiator {
-					rd.responderChannel <- message
-				} else if device == rd.responderDevice && !rd.isFinishSendIceCandidatesResponder {
-					rd.initiatorChannel <- message
-				} else {
-					userChannel <- out.MakeWrongResponse("Ты уже закончил отправку ice кандидатов", api_root_classes.ErrorResponse)
-				}
-			} else if in.DataType == DATA_TYPE_FINISH_SEND_ICE_CANDIDATES { // пришло сообщение о том, что кто-то завершил отправку ic
-				if device == rd.initiatorDevice {
-					rd.isFinishSendIceCandidatesInitiator = true
-				} else if device == rd.responderDevice {
-					rd.isFinishSendIceCandidatesResponder = true
-				}
-
-				// если оба пользователя закончили отправку ic - закрываем соединение
-				if rd.isFinishSendIceCandidatesInitiator && rd.isFinishSendIceCandidatesResponder {
-					rd.Unlock()
-					return
-				}
-			} else { // если ни один из типов данных сейчас не разрешен
-				userChannel <- out.MakeWrongResponse("Сейчас нельзя отправить эти данные", api_root_classes.ErrorResponse)
-			}
+		// Распаршиваем пришедший json
+		if err := in.FromJson(msg, &in); err != nil {
+			userChannel <- out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse)
+			rd.Unlock()
+			continue
 		}
-		// TODO: Стоит ли ограничить отправку кандидатов после флажка финиша отправки кандидатов? (Да, запретить)
+
+		if in.DataType == DATA_TYPE_OFFER {
+			if device != rd.initiatorDevice {
+				userChannel <- out.MakeWrongResponse("Отправлять offer может только инициатор", api_root_classes.ErrorResponse)
+				rd.Unlock()
+				continue
+			}
+
+			if rd.status != WAIT_OFFER {
+				userChannel <- out.MakeWrongResponse("Отправлять offer можно только в статусе WAIT_OFFER", api_root_classes.ErrorResponse)
+				rd.Unlock()
+				continue
+			}
+
+			out.DataType = in.DataType
+			out.Data = in.Data
+			rd.responderChannel <- out.MakeResponse(out, "")
+			rd.status = WAIT_ANSWER
+		} else if in.DataType == DATA_TYPE_ANSWER {
+			if device != rd.responderDevice {
+				userChannel <- out.MakeWrongResponse("Отправлять answer может только респондер", api_root_classes.ErrorResponse)
+				rd.Unlock()
+				continue
+			}
+
+			if rd.status != WAIT_ANSWER {
+				userChannel <- out.MakeWrongResponse("Отправлять answer можно только в статусе WAIT_ANSWER", api_root_classes.ErrorResponse)
+				rd.Unlock()
+				continue
+			}
+
+			out.DataType = in.DataType
+			out.Data = in.Data
+			rd.initiatorChannel <- out.MakeResponse(out, "")
+			rd.status = FINISH_RECEIVE_DATA
+		} else if in.DataType == DATA_TYPE_ICE_CANDIDATES {
+			if rd.status == WAIT_SECOND_USER {
+				userChannel <- out.MakeWrongResponse("Ожидание второго пользователя. Обмен данными невозможен", api_root_classes.ErrorResponse)
+				rd.Unlock()
+				continue
+			}
+
+			out.DataType = in.DataType
+			out.Data = in.Data
+			message := out.MakeResponse(out, "")
+
+			// отправляем ic пользователю, противоположному текущему (в случае, если текущий пользователь еще не закончил отправку ic)
+			if device == rd.initiatorDevice && !rd.isFinishSendIceCandidatesInitiator {
+				rd.responderChannel <- message
+			} else if device == rd.responderDevice && !rd.isFinishSendIceCandidatesResponder {
+				rd.initiatorChannel <- message
+			} else {
+				userChannel <- out.MakeWrongResponse("Ты уже закончил отправку ice кандидатов", api_root_classes.ErrorResponse)
+			}
+		} else if in.DataType == DATA_TYPE_FINISH_SEND_ICE_CANDIDATES {
+			if device == rd.initiatorDevice {
+				rd.isFinishSendIceCandidatesInitiator = true
+			} else if device == rd.responderDevice {
+				rd.isFinishSendIceCandidatesResponder = true
+			}
+
+			// если оба пользователя закончили отправку ic - закрываем соединение
+			if rd.isFinishSendIceCandidatesInitiator && rd.isFinishSendIceCandidatesResponder {
+				rd.Unlock()
+				return
+			}
+		} else {
+			userChannel <- out.MakeWrongResponse("Пришел неизвестный dataType", api_root_classes.ErrorResponse)
+		}
+
 		rd.Unlock()
 	}
 }
