@@ -10,7 +10,7 @@ const (
 	WAIT_SECOND_USER    = "WAIT_SECOND_USER"
 	WAIT_OFFER          = "WAIT_OFFER"
 	WAIT_ANSWER         = "WAIT_ANSWER"
-	WAIT_ICE_CANDIDATES = "WAIT_ICE_CANDIDATES"
+	FINISH_RECEIVE_DATA = "FINISH_RECEIVE_DATA"
 )
 
 // Мапа rooms хранит указатели на rd, так как rd - тяжелая структура, будет затратно каждый раз копировать ее
