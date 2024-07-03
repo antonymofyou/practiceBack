@@ -141,7 +141,7 @@ func (a *API_root_class) MakeResponse(v interface{}, nasotkuToken string) []byte
 // success - статус
 func (a *API_root_class) MakeWrongResponse(message string, success string) []byte {
 	out := MainResponseClass{ // экземпляр класса ответа
-		API_root_class: API_root_class{},
+		API_root_class: &API_root_class{},
 		Success:        success,
 		Message:        message,
 	}
@@ -169,7 +169,7 @@ func (*API_root_class) toJson(v interface{}) []byte {
 //--------------------------------MainResponseClass
 
 type MainResponseClass struct {
-	API_root_class
+	*API_root_class
 	Success string `json:"success"`
 	Message string `json:"message"`
 }
@@ -177,7 +177,7 @@ type MainResponseClass struct {
 //--------------------------------MainRequestClass
 
 type MainRequestClass struct {
-	API_root_class
+	*API_root_class
 	Device string `json:"device"`
 }
 

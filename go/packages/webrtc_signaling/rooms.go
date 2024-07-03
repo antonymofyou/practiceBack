@@ -4,19 +4,20 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"nasotku/includes/api_root_classes"
+	"nasotku/includes/auth"
 	"net/http"
 )
 
 // класс запроса
 type WebrtcSignalingRequest struct {
-	api_root_classes.MainRequestClass
+	*api_root_classes.MainRequestClass
 	DataType string `json:"dataType"`
 	Data     string `json:"data"`
 }
 
 // класс ответа
 type WebrtcSignalingResponse struct {
-	api_root_classes.MainResponseClass
+	*api_root_classes.MainResponseClass
 	DataType string `json:"dataType"`
 	Data     string `json:"data"`
 }
@@ -57,10 +58,10 @@ func RoomHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//--------------------------------Проверка пользователя
-	/*if err := auth.CheckUser(in, in); err != nil {
+	if err := auth.CheckUser(in, in); err != nil {
 		errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), err.Success))
 		return
-	}*/
+	}
 
 	// как будто комнату из БД получили
 	roomInfoDB, err := getRoomByDevice(in.Device)
@@ -147,6 +148,12 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string
 			userChannel <- out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse)
 			rd.Unlock()
 			continue
+		}
+
+		// проверка пользователя
+		if err := auth.CheckUser(in.MainRequestClass, in); err != nil {
+			errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), err.Success))
+			return
 		}
 
 		if in.DataType == DATA_TYPE_OFFER {

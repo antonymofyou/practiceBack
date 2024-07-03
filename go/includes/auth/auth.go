@@ -43,7 +43,7 @@ func newAuthError(error string, success string) *AuthError {
 // CheckUser проверка пользователя на основе signature и device
 // mainRequestClass - основной класс запроса, где указаны Signature и Device текущего запроса
 // data - данные, на основе которых нужно проверить, соответствует ли им Signature и Device (нужно передать полностью класс запроса для текущего вызванного метода)
-func CheckUser(mainRequestClass api_root_classes.MainRequestClass, data interface{}) *AuthError {
+func CheckUser(mainRequestClass *api_root_classes.MainRequestClass, data interface{}) *AuthError {
 	_, err := strconv.Atoi(mainRequestClass.Device) // приводим device к строке
 	if err != nil {
 		return newAuthError("параметр 'device' задан некорретно", api_root_classes.ErrorResponse)

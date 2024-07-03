@@ -6,18 +6,18 @@ import (
 )
 
 type UsersGetRequest struct {
-	api_root_classes.MainRequestClass
+	*api_root_classes.MainRequestClass
 	Id int `json:"id"`
 }
 
 type UsersGetResponse struct {
-	api_root_classes.MainResponseClass
+	*api_root_classes.MainResponseClass
 	UserNames []string `json:"userNames"`
 }
 
 func Get(w http.ResponseWriter, r *http.Request) {
-	var in = UsersGetRequest{}
-	var out = UsersGetResponse{
+	var in = &UsersGetRequest{}
+	var out = &UsersGetResponse{
 		UserNames: []string{},
 	}
 
