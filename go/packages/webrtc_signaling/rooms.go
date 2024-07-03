@@ -7,98 +7,113 @@ import (
 	"net/http"
 )
 
-/*
-* Принимать ic в статусах wait_offer, wait_answer, wait_ice_candidates.
-* Добавить возможность ставить флаги окончания отправки ic в этих статусах.
-*
-* Переименовать статус wait_ice_candidates в FINISH_RECEIVE_DATA (?) (окончание отправки offer/answer).
- */
+// класс запроса
+type WebrtcSignalingRequest struct {
+	api_root_classes.MainRequestClass
+	DataType string `json:"dataType"`
+	Data     string `json:"data"`
+}
 
-// хранение информации о комнатах (временно глобальная переменная)
-// на проде делать аллокацию для 1000+ значений.
-var rds = roomDataStorage{rooms: make(map[int]*roomData)}
+// класс ответа
+type WebrtcSignalingResponse struct {
+	api_root_classes.MainResponseClass
+	DataType string `json:"dataType"`
+	Data     string `json:"data"`
+}
 
+// типы данных, которые принимают и возвращают классы запросов (dataType)
+const (
+	DATA_TYPE_OFFER                      = "OFFER"
+	DATA_TYPE_ANSWER                     = "ANSWER"
+	DATA_TYPE_ICE_CANDIDATES             = "ICE_CANDIDATE"
+	DATA_TYPE_FINISH_SEND_ICE_CANDIDATES = "FINISH_SEND_ICE_CANDIDATES"
+)
+
+// хранение информации о комнатах (аллокация сразу под 1000 элементов)
+var rds = roomDataStorage{
+	rooms: make(map[int]*roomData, 1000),
+}
+
+// структура для перехода на websocket соединение
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 }
 
-func RoomHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		in := &api_root_classes.MainRequestClass{}
-		out := &api_root_classes.MainResponseClass{}
+func RoomHandler(w http.ResponseWriter, r *http.Request) {
+	in := &api_root_classes.MainRequestClass{}
+	out := &api_root_classes.MainResponseClass{}
 
-		// Установка вебсокет-соединения
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		if err := in.FromJson([]byte(r.URL.Query().Get("data")), &in); err != nil {
-			errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse))
-			return
-		}
-
-		//--------------------------------Проверка пользователя
-		/*if err := auth.CheckUser(in, in); err != nil {
-			errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), err.Success))
-			return
-		}*/
-
-		// как будто комнату из БД получили
-		roomInfoDB, err := getRoom(in.Device)
-		if err != nil {
-			errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse))
-			return
-		}
-
-		rds.Lock()
-		defer rds.Unlock()
-
-		// проверяем, есть ли уже такая комната в rds
-		if _, ok := rds.rooms[roomInfoDB.ID]; !ok {
-			// комнаты в rds еще нет, создаем ее.
-			rds.rooms[roomInfoDB.ID] = newRoomData(roomInfoDB)
-			// если комнаты в rds нет, значит, этот юзер подключился первым и будет ждать второго
-			rds.rooms[roomInfoDB.ID].status = WAIT_SECOND_USER
-			log.Println("created room data id", roomInfoDB.ID)
-		} else {
-			// Если комната уже создана и идет попытка сделать OTHER_DEVICE (сделлать второе подключение с одного девайса)
-			if (in.Device == roomInfoDB.initiatorDevice && rds.rooms[roomInfoDB.ID].initiatorConnected) ||
-				(in.Device == roomInfoDB.responderDevice && rds.rooms[roomInfoDB.ID].responderConnected) {
-				// функция отправит ошибку и закроет conn
-				errorJsonResponse(conn, out.MakeWrongResponse("OTHER_DEVICE", api_root_classes.ErrorResponse))
-				return
-			}
-			// Если комната найдена в rds и это не OTHER_DEVICE, значит подключился второй юзер. Меняем статус.
-			rds.rooms[roomInfoDB.ID].status = WAIT_OFFER
-		}
-
-		// Ставим соответствующий флажок, что подключился либо инициатор либо респондер и заодно определяем,
-		// с каким каналом передать conn в горутину
-		var userChannel chan []byte = nil
-		if in.Device == roomInfoDB.initiatorDevice {
-			rds.rooms[roomInfoDB.ID].initiatorConnected = true
-			userChannel = rds.rooms[roomInfoDB.ID].initiatorChannel
-			log.Println("initiator ID", roomInfoDB.initiatorDevice, "connected")
-		} else if in.Device == roomInfoDB.responderDevice {
-			rds.rooms[roomInfoDB.ID].responderConnected = true
-			userChannel = rds.rooms[roomInfoDB.ID].responderChannel
-			log.Println("responder ID", roomInfoDB.responderDevice, "connected")
-		}
-
-		// Если хоть один юзер отключился, отключаем всех.
-		exitFunc := func() {
-			// Отключился один - отключаются все. Функция корректно закрывает соединения, закрывает каналы,
-			// если они не закрыты, чистит информацию из памяти go.
-			removeAllConnections(conn, roomInfoDB.ID, &rds, rds.rooms[roomInfoDB.ID])
-		}
-
-		// Запуск горутин на слушание и отправку сообщений
-		go readMessagesFromWebsocket(conn, rds.rooms[roomInfoDB.ID], in.Device, exitFunc) // from webSocket
-		go writeMessagesToWebsocket(conn, userChannel, exitFunc)
+	// Установка вебсокет-соединения
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+		return
 	}
+
+	if err := in.FromJson([]byte(r.URL.Query().Get("data")), &in); err != nil {
+		errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse))
+		return
+	}
+
+	//--------------------------------Проверка пользователя
+	/*if err := auth.CheckUser(in, in); err != nil {
+		errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), err.Success))
+		return
+	}*/
+
+	// как будто комнату из БД получили
+	roomInfoDB, err := getRoomByDevice(in.Device)
+	if err != nil {
+		errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse))
+		return
+	}
+
+	rds.Lock()
+	defer rds.Unlock()
+
+	// проверяем, есть ли уже такая комната в rds
+	if _, ok := rds.rooms[roomInfoDB.ID]; !ok {
+		// комнаты в rds еще нет, создаем ее.
+		rds.rooms[roomInfoDB.ID] = newRoomData(roomInfoDB)
+		// если комнаты в rds нет, значит, этот юзер подключился первым и будет ждать второго
+		rds.rooms[roomInfoDB.ID].status = WAIT_SECOND_USER
+		log.Println("created room data id", roomInfoDB.ID)
+	} else {
+		// Если комната уже создана и идет попытка сделать OTHER_DEVICE (сделлать второе подключение с одного девайса)
+		if (in.Device == roomInfoDB.initiatorDevice && rds.rooms[roomInfoDB.ID].initiatorConnected) ||
+			(in.Device == roomInfoDB.responderDevice && rds.rooms[roomInfoDB.ID].responderConnected) {
+			// функция отправит ошибку и закроет conn
+			errorJsonResponse(conn, out.MakeWrongResponse("OTHER_DEVICE", api_root_classes.ErrorResponse))
+			return
+		}
+		// Если комната найдена в rds и это не OTHER_DEVICE, значит подключился второй юзер. Меняем статус.
+		rds.rooms[roomInfoDB.ID].status = WAIT_OFFER
+	}
+
+	// Ставим соответствующий флажок, что подключился либо инициатор либо респондер и заодно определяем,
+	// с каким каналом передать conn в горутину
+	var userChannel chan []byte = nil
+	if in.Device == roomInfoDB.initiatorDevice {
+		rds.rooms[roomInfoDB.ID].initiatorConnected = true
+		userChannel = rds.rooms[roomInfoDB.ID].initiatorChannel
+		log.Println("initiator ID", roomInfoDB.initiatorDevice, "connected")
+	} else if in.Device == roomInfoDB.responderDevice {
+		rds.rooms[roomInfoDB.ID].responderConnected = true
+		userChannel = rds.rooms[roomInfoDB.ID].responderChannel
+		log.Println("responder ID", roomInfoDB.responderDevice, "connected")
+	}
+
+	// Если хоть один юзер отключился, отключаем всех.
+	exitFunc := func() {
+		// Отключился один - отключаются все. Функция корректно закрывает соединения, закрывает каналы,
+		// если они не закрыты, чистит информацию из памяти go.
+		removeAllConnections(conn, roomInfoDB.ID, &rds, rds.rooms[roomInfoDB.ID])
+	}
+
+	// Запуск горутин на слушание и отправку сообщений
+	go readMessagesFromWebsocket(conn, rds.rooms[roomInfoDB.ID], in.Device, exitFunc) // from webSocket
+	go writeMessagesToWebsocket(conn, userChannel, exitFunc)
 }
 
 func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string, exitFunc func()) {

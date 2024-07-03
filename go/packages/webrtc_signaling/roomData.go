@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-// Статусы для roomData
+// статусы комнаты
 const (
 	WAIT_SECOND_USER    = "WAIT_SECOND_USER"
 	WAIT_OFFER          = "WAIT_OFFER"
@@ -40,7 +40,7 @@ type roomData struct {
 }
 
 // функция получения информации о комнате из БД
-func getRoom(userDevice string) (*roomInfoFromDB, error) {
+func getRoomByDevice(device string) (*roomInfoFromDB, error) {
 	return &roomInfoFromDB{
 		ID:              1,
 		initiatorDevice: "1",
@@ -56,7 +56,7 @@ func newRoomData(roomInfo *roomInfoFromDB) *roomData {
 	}
 }
 
-// TODO: закомментировать новые функции
+// корректное закрытие каналов текущей комнаты
 func (rd *roomData) closeConnections() {
 	rd.Lock()
 	defer rd.Unlock()

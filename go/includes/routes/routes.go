@@ -24,5 +24,5 @@ func InitRoutes() {
 
 	// роут вебсокета (создание комнат)
 	// device - обязательный параметр запроса
-	http.HandleFunc("/go/room", webrtc_signaling.RoomHandler())
+	http.HandleFunc("/go/room", webrtc_signaling.RoomHandler)
 }
