@@ -7,10 +7,10 @@ import (
 
 // статусы комнаты
 const (
-	WAIT_SECOND_USER    = "WAIT_SECOND_USER"
-	WAIT_OFFER          = "WAIT_OFFER"
-	WAIT_ANSWER         = "WAIT_ANSWER"
-	FINISH_RECEIVE_DATA = "FINISH_RECEIVE_DATA"
+	RoomStatusWaitSecondUser    = "WAIT_SECOND_USER"
+	RoomStatusWaitOffer         = "WAIT_OFFER"
+	RoomStatusWaitAnswer        = "WAIT_ANSWER"
+	RoomStatusFinishReceiveData = "FINISH_RECEIVE_DATA"
 )
 
 // Мапа rooms хранит указатели на rd, так как rd - тяжелая структура, будет затратно каждый раз копировать ее

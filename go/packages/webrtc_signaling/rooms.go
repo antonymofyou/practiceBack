@@ -24,10 +24,10 @@ type WebrtcSignalingResponse struct {
 
 // типы данных, которые принимают и возвращают классы запросов (dataType)
 const (
-	DATA_TYPE_OFFER                      = "OFFER"
-	DATA_TYPE_ANSWER                     = "ANSWER"
-	DATA_TYPE_ICE_CANDIDATES             = "ICE_CANDIDATE"
-	DATA_TYPE_FINISH_SEND_ICE_CANDIDATES = "FINISH_SEND_ICE_CANDIDATES"
+	DataTypeOffer                   = "OFFER"
+	DataTypeAnswer                  = "ANSWER"
+	DataTypeIceCandidates           = "ICE_CANDIDATE"
+	DataTypeFinishSendIceCandidates = "FINISH_SEND_ICE_CANDIDATES"
 )
 
 // хранение информации о комнатах (аллокация сразу под 1000 элементов)
@@ -78,7 +78,7 @@ func RoomHandler(w http.ResponseWriter, r *http.Request) {
 		// комнаты в rds еще нет, создаем ее.
 		rds.rooms[roomInfoDB.ID] = newRoomData(roomInfoDB)
 		// если комнаты в rds нет, значит, этот юзер подключился первым и будет ждать второго
-		rds.rooms[roomInfoDB.ID].status = WAIT_SECOND_USER
+		rds.rooms[roomInfoDB.ID].status = RoomStatusWaitSecondUser
 		log.Println("created room data id", roomInfoDB.ID)
 	} else {
 		// Если комната уже создана и идет попытка сделать OTHER_DEVICE (сделлать второе подключение с одного девайса)
@@ -89,7 +89,7 @@ func RoomHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Если комната найдена в rds и это не OTHER_DEVICE, значит подключился второй юзер. Меняем статус.
-		rds.rooms[roomInfoDB.ID].status = WAIT_OFFER
+		rds.rooms[roomInfoDB.ID].status = RoomStatusWaitOffer
 	}
 
 	// Ставим соответствующий флажок, что подключился либо инициатор либо респондер и заодно определяем,
@@ -156,14 +156,14 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string
 			return
 		}
 
-		if in.DataType == DATA_TYPE_OFFER {
+		if in.DataType == DataTypeOffer {
 			if device != rd.initiatorDevice {
 				userChannel <- out.MakeWrongResponse("Отправлять offer может только инициатор", api_root_classes.ErrorResponse)
 				rd.Unlock()
 				continue
 			}
 
-			if rd.status != WAIT_OFFER {
+			if rd.status != RoomStatusWaitOffer {
 				userChannel <- out.MakeWrongResponse("Отправлять offer можно только в статусе WAIT_OFFER", api_root_classes.ErrorResponse)
 				rd.Unlock()
 				continue
@@ -172,15 +172,15 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string
 			out.DataType = in.DataType
 			out.Data = in.Data
 			rd.responderChannel <- out.MakeResponse(out, "")
-			rd.status = WAIT_ANSWER
-		} else if in.DataType == DATA_TYPE_ANSWER {
+			rd.status = RoomStatusWaitAnswer
+		} else if in.DataType == DataTypeAnswer {
 			if device != rd.responderDevice {
 				userChannel <- out.MakeWrongResponse("Отправлять answer может только респондер", api_root_classes.ErrorResponse)
 				rd.Unlock()
 				continue
 			}
 
-			if rd.status != WAIT_ANSWER {
+			if rd.status != RoomStatusWaitAnswer {
 				userChannel <- out.MakeWrongResponse("Отправлять answer можно только в статусе WAIT_ANSWER", api_root_classes.ErrorResponse)
 				rd.Unlock()
 				continue
@@ -189,9 +189,9 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string
 			out.DataType = in.DataType
 			out.Data = in.Data
 			rd.initiatorChannel <- out.MakeResponse(out, "")
-			rd.status = FINISH_RECEIVE_DATA
-		} else if in.DataType == DATA_TYPE_ICE_CANDIDATES {
-			if rd.status == WAIT_SECOND_USER {
+			rd.status = RoomStatusFinishReceiveData
+		} else if in.DataType == DataTypeIceCandidates {
+			if rd.status == RoomStatusWaitSecondUser {
 				userChannel <- out.MakeWrongResponse("Ожидание второго пользователя. Обмен данными невозможен", api_root_classes.ErrorResponse)
 				rd.Unlock()
 				continue
@@ -209,7 +209,7 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string
 			} else {
 				userChannel <- out.MakeWrongResponse("Ты уже закончил отправку ice кандидатов", api_root_classes.ErrorResponse)
 			}
-		} else if in.DataType == DATA_TYPE_FINISH_SEND_ICE_CANDIDATES {
+		} else if in.DataType == DataTypeFinishSendIceCandidates {
 			if device == rd.initiatorDevice {
 				rd.isFinishSendIceCandidatesInitiator = true
 			} else if device == rd.responderDevice {
