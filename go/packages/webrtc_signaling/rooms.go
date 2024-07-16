@@ -140,8 +140,16 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string
 
 		rd.Lock()
 
-		in := &WebrtcSignalingRequest{}
-		out := &WebrtcSignalingResponse{}
+		in := &WebrtcSignalingRequest{
+			MainRequestClass: &api_root_classes.MainRequestClass{
+				API_root_class: &api_root_classes.API_root_class{Signature: ""},
+			},
+		}
+		out := &WebrtcSignalingResponse{
+			MainResponseClass: &api_root_classes.MainResponseClass{
+				API_root_class: &api_root_classes.API_root_class{Signature: ""},
+			},
+		}
 
 		// Распаршиваем пришедший json
 		if err := in.FromJson(msg, &in); err != nil {
