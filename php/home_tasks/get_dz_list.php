@@ -14,37 +14,24 @@ class HometasksGetHometaskResponse extends MainResponseClass {
 
     /*
      * Массив словарей, где каждый словарь имеет следующие поля:
-     *     - is_probnik
-     *     - ht_number 
-     *     - type_p1 
-     *     - ht_nums_P1 
-     *     - ht_nums_P2 
-     *     - ht_deadline 
-     *     - ht_deadline_time 
-     *     - ht_status
+     *     - isProbnik
+     *     - htNumber 
+     *     - typeP1
+     *     - htNumsP1
+     *     - htNumsP2 
+     *     - htDeadline 
+     *     - htDeadlineTime 
+     *     - htStatus
      */
-    public $notNumber200Tasks = []; // задания всех номеров, но без 200-х
+    public $tasks = []; // задания всех номеров, но без 200-х
 
     /*
      * Массив словарей, где каждый словарь имеет следующие поля:
-     *     - is_probnik
-     *     - ht_number 
-     *     - type_p1 
-     *     - ht_nums_P1 
-     *     - ht_nums_P2 
-     *     - ht_deadline 
-     *     - ht_deadline_time 
-     *     - ht_status
-     */
-    public $number200Tasks = []; // задания с номером 200 
-
-    /*
-     * Массив словарей, где каждый словарь имеет следующие поля:
-     *     - cc_check_date
-     *     - cc_check_time
-     *     - ht_status
-     *     - ht_number
-     *     - ht_num
+     *     - ccCheckDate
+     *     - ccCheckTime
+     *     - htStatus
+     *     - htNumber
+     *     - htNum
      */
     public $crossCheks = []; // массив словарей с перекрестной проверкой
 }
@@ -73,68 +60,47 @@ if (!($user_type == 'Админ' || $user_type == 'Куратор') )
 }
 //--------------------------------Получение домашних заданий не с номером 200
 $stmt = $pdo->prepare("
-        SELECT *, DATE_FORMAT(`ht_deadline`,'%d.%m.%Y') as `ht_deadline`
-        FROM `home_tasks`
-        WHERE `ht_number` != :ht_number
-        ORDER BY `home_tasks`.`ht_deadline` DESC"
+        SELECT 'isProbnik', 'htNumber', 'typeP1', 'htNumsP1', 'htNumsP2', 'htDeadline', 'htDeadlineTime', 'htStatus'
+        FROM `homeTasks`
+        WHERE `htNumber` != 200
+        ORDER BY `htDeadline`"
         ) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
 
-$ht_number = 200;
-$stmt->bindParam(':ht_number', $ht_number, PDO::PARAM_INT);
 $stmt->execute();
 
-if ($stmt->rowCount() == 0) $out->make_wrong_resp("записей не найдено в home_tasks");
-$not_number_200_tasks = $stmt->fetch(PDO::FETCH_ASSOC);
+if ($stmt->rowCount() == 0) $out->make_wrong_resp("записей не найдено");
+$notNumber200Tasks = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
-$not_number_200_tasks = [
-    'is_probnik' => (string) $not_number_200_tasks['is_probnik'],
-    'ht_number' => (string) $not_number_200_tasks['ht_number'],
-    'type_p1' => (string) $not_number_200_tasks['type_p1'],
-    'ht_nums_P1' => (string) $not_number_200_tasks['ht_nums_P1'],
-    'ht_nums_P2' => (string) $not_number_200_tasks['ht_nums_P2'],
-    'ht_deadline' => (string) $not_number_200_tasks['ht_deadline'],
-    'ht_deadline_time' => (string) $not_number_200_tasks['ht_deadline_time'],
-    'ht_status' => (string) $not_number_200_tasks['ht_status'],
-];
 
 //--------------------------------Получение домашних заданий с номером 200
 $stmt = $pdo->prepare("
-        SELECT *, DATE_FORMAT(`ht_deadline`,'%d.%m.%Y') as `ht_deadline`
-        FROM `home_tasks`
-        WHERE `ht_number` = :ht_number
-        ORDER BY `home_tasks`.`ht_deadline` DESC"
+        SELECT 'isProbnik', 'htNumber', 'typeP1', 'htNumsP1', 'htNumsP2', 'htDeadline', 'htDeadlineTime', 'htStatus'
+        FROM `homeTasks`
+        WHERE `htNumber`= 200
+        ORDER BY `htDeadline`"
         ) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
 
-$ht_number = 200;
-$stmt->bindParam(':ht_number', $ht_number, PDO::PARAM_INT);
 $stmt->execute();
 
-if ($stmt->rowCount() == 0) $out->make_wrong_resp("записей не найдено в home_tasks");
-$number_200_tasks = $stmt->fetch(PDO::FETCH_ASSOC);
+if ($stmt->rowCount() == 0) $out->make_wrong_resp("записей не найдено");
+$number200Tasks = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
-$number_200_tasks = [
-    'is_probnik' => (string) $number_200_tasks['is_probnik'],
-    'ht_number' => (string) $number_200_tasks['ht_number'],
-    'type_p1' => (string) $number_200_tasks['type_p1'],
-    'ht_nums_P1' => (string) $number_200_tasks['ht_nums_P1'],
-    'ht_nums_P2' => (string) $number_200_tasks['ht_nums_P2'],
-    'ht_deadline' => (string) $number_200_tasks['ht_deadline'],
-    'ht_deadline_time' => (string) $number_200_tasks['ht_deadline_time'],
-    'ht_status' => (string) $number_200_tasks['ht_status'],
-];
+
+//--------------------------------Записываем полученные задачи в $tasks
+$tasks = array_merge($notNumber200Tasks, $number200Tasks);
 
 //--------------------------------Формируем выдачу для перекрестной проверки
 $stmt = $pdo->prepare("
-    SELECT `cross_check`.`ht_num`, `cross_check`.`ht_status`, `cross_check`.`cc_check_date`, `cross_check`.`cc_check_time`,
-    `ht_user`.`ht_user_checker`, `ht_user`.`ht_number`
-    FROM `cross_check`
-    LEFT JOIN `ht_user` ON `cross_check`.`curator_vk_id` = `ht_user`.`ht_user_checker`
-    AND `cross_check`.`ht_num` = `ht_user`.`ht_number` AND `ht_user`.`ht_user_status_p2` = 'Проверен'
-    LEFT JOIN `home_tasks` ON `home_tasks`.`ht_number` = `cross_check`.`ht_num`
-    WHERE `cross_check`.`checker_id` = :user_id
-    AND (`cross_check`.`ht_status` = 0 OR `cross_check`.`ht_status` IS NULL)
-    AND DATEDIFF(CURDATE(), `home_tasks`.`ht_deadline`) > -3
-    GROUP BY `cross_check`.`ht_num`, `cross_check`.`checker_id`"
+    SELECT `crossCheck`.`htNum`, `crossCheck`.`htStatus`, `crossCheck`.`ccCheckDate`, `crossCheck`.`ccCheckTime`,
+    `htUser`.`htUserChecker`, `htUser`.`htNumber`
+    FROM `crossCheck`
+    LEFT JOIN `htUser` ON `crossCheck`.`curatorVkId` = `htUser`.`htUserChecker`
+    AND `crossCheck`.`htNum` = `htUser`.`htNumber` AND `htUser`.`htUserStatus_p2` = 'Проверен'
+    LEFT JOIN `homeTasks` ON `homeTasks`.`htNumber` = `crossCheck`.`htNum`
+    WHERE `crossCheck`.`checkerId` = :user_id
+    AND (`crossCheck`.`htStatus` = 0 OR `crossCheck`.`htStatus` IS NULL)
+    AND DATEDIFF(CURDATE(), `homeTasks`.`htDeadline`) > -3
+    GROUP BY `crossCheck`.`htNum`, `crossCheck`.`checkerId`"
     ) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
 
 $stmt->bindParam(':user_id', $user_vk_id, PDO::PARAM_INT);
@@ -144,17 +110,16 @@ if ($stmt->rowCount() == 0) $out->make_wrong_resp("записей не найд�
 $crosscheks = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 $crosscheks = [
-    'cc_check_date' => (string) $crosscheks['cc_check_date'],
-    'cc_check_time' => (string) $crosscheks['cc_check_time'],
-    'ht_status' => (string) $crosscheks['ht_status'],
-    'ht_number' => (string) $crosscheks['ht_number'],
-    'ht_num' => (string) $crosscheks['ht_num'],
+    'ccCheckDate' => (string) $crosscheks['ccCheckDate'],
+    'ccCheckTime' => (string) $crosscheks['ccCheckTime'],
+    'htStatus' => (string) $crosscheks['htStatus'],
+    'htNumber' => (string) $crosscheks['htNumber'],
+    'htNum' => (string) $crosscheks['htNum'],
 ];
 
 //--------------------------------Формируем ответ
 $out->success = '1';
-$out->not_number_200_tasks = (object) $not_number_200_tasks;
-$out->number_200_tasks = (object) $number_200_tasks;
+$out->tasks = (object) $tasks;
 $out->crosscheks = (object) $crosscheks;
 $out->make_resp('');
 
