@@ -1,7 +1,9 @@
 package webrtc_signaling
 
 import (
+	"errors"
 	"log"
+	"nasotku/includes/db"
 	"sync"
 )
 
@@ -41,11 +43,26 @@ type roomData struct {
 
 // функция получения информации о комнате из БД
 func getRoomByDevice(device string) (*roomInfoFromDB, error) {
-	return &roomInfoFromDB{
-		ID:              1,
-		initiatorDevice: "1",
-		responderDevice: "2",
-	}, nil
+	// получаем сессию пользователя по device (пользователь может быть как инициатором, так и респондером)
+	rows, err := db.Db.Query(
+		"SELECT `id`, `user_initiator_device`, `user_responder_device` FROM `wrtc_sessions` WHERE `user_initiator_device` = ? OR `user_responder_device` = ? LIMIT 1;",
+		device,
+		device,
+	)
+	if err != nil {
+		return nil, errors.New("ошибка БД: " + err.Error())
+	}
+	defer rows.Close()
+
+	if !rows.Next() { // проверяем наличие результата
+		return nil, errors.New("комната для переданного device не найдена")
+	}
+
+	// биндим результат последовательно к каждому полю структуры (для этого передаем указатель на поле)
+	roomInfo := &roomInfoFromDB{}
+	rows.Scan(&roomInfo.ID, &roomInfo.initiatorDevice, &roomInfo.responderDevice)
+
+	return roomInfo, nil
 }
 
 func newRoomData(roomInfo *roomInfoFromDB) *roomData {
