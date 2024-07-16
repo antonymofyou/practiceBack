@@ -12,7 +12,7 @@ import (
 func InitRoutes() {
 
 	// пример роута с использованием анонимной функции
-	http.HandleFunc("/go", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/go/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Ты на главной странице")
 	})
 
@@ -22,7 +22,6 @@ func InitRoutes() {
 	// роут вебсокета (эхо-метод, что пришло, то и вернул)
 	http.HandleFunc("/go/ws/echo", ws.Echo)
 
-	// роут вебсокета (создание комнат)
-	// device - обязательный параметр запроса
-	http.HandleFunc("/go/room", webrtc_signaling.RoomHandler)
+	// роут вебсокета для тренировки устного зачёта 1 на 1
+	http.HandleFunc("/go/train_zachet_verbal_chat/ws", webrtc_signaling.RoomHandler)
 }
