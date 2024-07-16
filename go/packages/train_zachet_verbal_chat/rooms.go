@@ -1,4 +1,4 @@
-package webrtc_signaling
+package train_zachet_verbal_chat
 
 import (
 	"errors"
