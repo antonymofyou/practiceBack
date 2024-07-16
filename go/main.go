@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/joho/godotenv"
 	"log"
 	"nasotku/includes/config"
 	"nasotku/includes/db"
@@ -9,11 +10,16 @@ import (
 )
 
 func main() {
+	// загружаем переменные окружения
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal("Произошла ошибка загрузки переменных окружения:", err.Error())
+	}
+
 	// инициализация конфига
 	config.Cfg = config.NewConfig()
 
 	// подключение к базе данных
-	var err error
 	db.Db, err = db.NewDb()
 	if err != nil {
 		log.Fatal("Не удалось подключиться к базе данных:", err.Error())
@@ -25,7 +31,7 @@ func main() {
 
 	// запуск обработки запросов
 	log.Println("[APP] Start")
-	if err := http.ListenAndServe(config.Cfg.Addr, nil); err != nil {
+	if err := http.ListenAndServe(config.Cfg.ServerAddr, nil); err != nil {
 		log.Fatal(err)
 	}
 }
