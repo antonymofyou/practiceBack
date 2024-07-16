@@ -203,8 +203,9 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string
 
 		// проверка пользователя
 		if err := auth.CheckUser(in.MainRequestClass, in); err != nil {
-			errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), err.Success))
-			return
+			userChannel <- out.MakeWrongResponse(err.Error(), err.Success)
+			rd.Unlock()
+			continue
 		}
 
 		if in.DataType == DataTypeOffer {
