@@ -29,6 +29,7 @@ type WebrtcSignalingResponse struct {
 
 // типы данных, которые принимают и возвращают классы запросов (dataType)
 const (
+	DataTypeRole                    = "ROLE"
 	DataTypeOffer                   = "OFFER"
 	DataTypeAnswer                  = "ANSWER"
 	DataTypeIceCandidates           = "ICE_CANDIDATE"
@@ -168,11 +169,24 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string
 
 	// определяем канал текущего пользователя для удобного обращения к нему без if'ов
 	var userChannel chan []byte
+	var userRole string
 	if device == rd.initiatorDevice {
 		userChannel = rd.initiatorChannel
+		userRole = "initiator"
 	} else if device == rd.responderDevice {
 		userChannel = rd.responderChannel
+		userRole = "responder"
 	}
+
+	// информируем пользователя о том, какая у него роль
+	in := &WebrtcSignalingRequest{
+		MainRequestClass: &api_root_classes.MainRequestClass{
+			API_root_class: &api_root_classes.API_root_class{Signature: ""},
+		},
+	}
+	in.DataType = DataTypeRole
+	in.Data = userRole
+	userChannel <- in.MakeResponse(in, "")
 
 	for {
 		_, msg, err := conn.ReadMessage()
