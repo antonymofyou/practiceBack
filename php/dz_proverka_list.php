@@ -150,10 +150,10 @@ $homeTask = $stmn->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
 $homeTask = [
-	'htDeadline' => $homeTask['ht_deadline'],
-	'htDeadlineTime' => $homeTask['ht_deadline_time'],
-	'htDeadlineCur' => $homeTask['ht_deadline_cur'],
-	'isProbnik' => $homeTask['is_probnik'],
+	'htDeadline' => (string) $homeTask['ht_deadline'],
+	'htDeadlineTime' => (string) $homeTask['ht_deadline_time'],
+	'htDeadlineCur' => (string) $homeTask['ht_deadline_cur'],
+	'isProbnik' => (string) $homeTask['is_probnik'],
 ];
 
 //--------------------------------Получение перекрёстной проверки
@@ -170,12 +170,12 @@ $crossCheck = $stmn->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
 $crossCheck = [
-	'htNum' => $crossCheck['ht_num'],
-	'htStatus' => $crossCheck['ht_status'],
-	'ccCheckDate' => $crossCheck['cc_check_date'],
-	'ccCheckTime' => $crossCheck['cc_check_time'],
-	'htUserChecker' => $crossCheck['ht_user_checker'],
-	'htNumber' => $crossCheck['ht_number'],
+	'htNum' => (string) $crossCheck['ht_num'],
+	'htStatus' => (string) $crossCheck['ht_status'],
+	'ccCheckDate' => (string) $crossCheck['cc_check_date'],
+	'ccCheckTime' => (string) $crossCheck['cc_check_time'],
+	'htUserChecker' => (string) $crossCheck['ht_user_checker'],
+	'htNumber' => (string) $crossCheck['ht_number'],
 ];
 //--------------------------------Формирование ответа
 $out->success = '1';
