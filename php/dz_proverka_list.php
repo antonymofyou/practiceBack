@@ -1,4 +1,4 @@
-<?php
+<?php // Получение списка работ для дз
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -6,16 +6,16 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 
-// класс запроса для получения информации о домашнем задании
-class HomeTaskCheck extends MainRequestClass {
+// класс запроса
+class HomeTaskDzProverkaList extends MainRequestClass {
 	public $htNumber = ''; // идентификатор домашнего задания, которое нужно отобразить
 	
 }
-$in = new HomeTasksGetById();
+$in = new HomeTaskDzProverkaList();
 $in->from_json(file_get_contents('php://input'));
 
 // класс ответа
-class HomeTasksCheckResponse extends MainResponseClass {
+class HomeTaskDzProverkaListResponse extends MainResponseClass {
 	/*
      * Массив словарей, где каждый словарь имеет следующие поля:
      *     - userName - имя пользователя
@@ -60,7 +60,7 @@ class HomeTasksCheckResponse extends MainResponseClass {
     public $crossCheck = []; // данные об окончании задания и является ли задание пробником
 }
 
-$out = new HomeTasksCheckResponse();
+$out = new HomeTaskDzProverkaListResponse();
 
 //--------------------------------Подключение к базе данных
 try {
@@ -93,32 +93,29 @@ $stmt->closeCursor(); unset($stmt);
 //--------------------------------Получение списка пользователей
 $for_curator='';
 if ($user_type == 'Куратор') {
-	$for_curator="AND (`users`.`user_curator`='".$user_id."' OR `users`.`user_curator_dz`='".$user_id."')  ";//Добавляем выдачу только учеников куратора, и авторитарных
+	$forCurator="AND (`users`.`user_curator`='".$user_id."' OR `users`.`user_curator_dz`='".$user_id."')  ";//Добавляем выдачу только учеников куратора, и авторитарных
 }
-$stmn->prepare("SELECT `users`.`user_name`, `users`.`user_surname`, `users`.`user_curator`, `users`.`user_vk_id`, `users`.`user_blocked`, `users`.`user_tarif_num`, CONCAT(  `curators`.`user_surname` ,  ' ', `curators`.`user_name` ) AS  `curator`, 
-IF(`ht_user`.`ht_user_status_p2` IN('Готово','Самопров'),0,1) as `status_gotovo`,
-`ht_user_date_p1`,
-`ht_user`.`ht_user_time_p1`,
-`ht_user_date_p2`,
-`ht_user`.`ht_user_time_p2`,
-`ht_user`.`ht_user_maxballov_p1`,
-`ht_user`.`ht_user_maxballov_p2`,
-`ht_user`.`ht_user_ballov_p1`,
-`ht_user`.`ht_user_ballov_p2`,
-`ht_user`.`ht_user_status_p1`,
-`ht_user`.`ht_user_status_p2`
-FROM `users`
-LEFT JOIN  `users` AS  `curators` ON  (`users`.`user_curator` =  `curators`.`user_vk_id`  AND (`users`.`user_curator_dz` IS NULL OR `users`.`user_curator_dz`=0)) OR `users`.`user_curator_dz`=`curators`.`user_vk_id`
-LEFT JOIN `ht_user` ON `users`.`user_vk_id`=`ht_user`.`user_id` AND `ht_user`.`ht_number`='".$htNumber."'
-WHERE `users`.`user_type` IN ('Частичный','Интенсив','Админ', 'Куратор') ".$for_curator."
-AND (`users`.`user_blocked`='0' OR  `users`.`user_blocked` IS NULL)
-ORDER BY `curator` DESC,`users`.`user_tarif_num` DESC, `status_gotovo`, `ht_user`.`ht_user_status_p2` ASC, `ht_user`.`ht_user_date_p2`, `ht_user`.`ht_user_time_p2`, `ht_user`.`ht_user_status_p1` ASC, `users`.`user_blocked`, `users`.`user_surname`
+$stmt->prepare("SELECT `users`.`user_name`, `users`.`user_surname`, `users`.`user_curator`, `users`.`user_vk_id`, `users`.`user_blocked`, `users`.`user_tarif_num`, 
+	CONCAT(  `curators`.`user_surname` ,  ' ', `curators`.`user_name` ) AS  `curator`, 
+	IF(`ht_user`.`ht_user_status_p2` IN('Готово','Самопров'),0,1) as `status_gotovo`,
+	`ht_user_date_p1`, `ht_user`.`ht_user_time_p1`, `ht_user_date_p2`, `ht_user`.`ht_user_time_p2`, `ht_user`.`ht_user_maxballov_p1`, `ht_user`.`ht_user_maxballov_p2`, `ht_user`.`ht_user_ballov_p1`,
+	`ht_user`.`ht_user_ballov_p2`, `ht_user`.`ht_user_status_p1`, `ht_user`.`ht_user_status_p2`
+	FROM `users`
+	LEFT JOIN  `users` AS  `curators` ON  (`users`.`user_curator` =  `curators`.`user_vk_id`  AND (`users`.`user_curator_dz` IS NULL OR `users`.`user_curator_dz`=0)) OR `users`.`user_curator_dz`=`curators`.`user_vk_id`
+	LEFT JOIN `ht_user` ON `users`.`user_vk_id`=`ht_user`.`user_id` AND `ht_user`.`ht_number`=:ht_number
+	WHERE `users`.`user_type` IN ('Частичный','Интенсив','Админ', 'Куратор') :for_curator
+	AND (`users`.`user_blocked`='0' OR  `users`.`user_blocked` IS NULL)
+	ORDER BY `curator` DESC,`users`.`user_tarif_num` DESC, `status_gotovo`, `ht_user`.`ht_user_status_p2` ASC, `ht_user`.`ht_user_date_p2`, `ht_user`.`ht_user_time_p2`, 
+	`ht_user`.`ht_user_status_p1` ASC, `users`.`user_blocked`, `users`.`user_surname`
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
-$stmn->execute() or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (1)');
-if($stmn->rowCount() == 0) $out->make_wrong_resp("Ни один пользователь не был найден для задания [ID задания: {$in->htNumber}]");
+$stmt->execute([
+	'for_curator' => $forCurator,
+	'ht_number' => $in->htNumber,
+]) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (1)');
+if($stmt->rowCount() == 0) $out->make_wrong_resp("Ни один пользователь не был найден для задания [ID задания: {$in->htNumber}]");
 
 $users = [];
-while ($user = $stmn->fetch(PDO::FETCH_ASSOC)){
+while ($user = $stmt->fetch(PDO::FETCH_ASSOC)){
 	$users[] = [
 		'userName' => (string) $user['user_name'],
 		'userSurname' => (string) $user['user_surname'],
@@ -141,12 +138,12 @@ while ($user = $stmn->fetch(PDO::FETCH_ASSOC)){
 }
 $stmt->closeCursor(); unset($stmt);
 //--------------------------------Получение срока выполнения задания
-$stmn = $pdo->prepare("SELECT `ht_deadline`, `ht_deadline_time`, `ht_deadline_cur`, `is_probnik`  
+$stmt = $pdo->prepare("SELECT `ht_deadline`, `ht_deadline_time`, `ht_deadline_cur`, `is_probnik`  
 	FROM `home_tasks` 
 	WHERE `ht_number`= :ht_number
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
-$stmn->execute(['ht_number' => $in->htNumber]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
-$homeTask = $stmn->fetch(PDO::FETCH_ASSOC);
+$stmt->execute(['ht_number' => $in->htNumber]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
+$homeTask = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
 $homeTask = [
@@ -157,16 +154,19 @@ $homeTask = [
 ];
 
 //--------------------------------Получение перекрёстной проверки
-$stmn = $pdo->prepare("SELECT `cross_check`.`ht_num`, `cross_check`.`ht_status`, `cross_check`.`cc_check_date`, `cross_check`.`cc_check_time`, 
-			`ht_user`.`ht_user_checker`, `ht_user`.`ht_number`
-		FROM `cross_check` 
-		LEFT JOIN `ht_user` ON `cross_check`.`curator_vk_id`=`ht_user`.`ht_user_checker` 
-			AND `cross_check`.`ht_num`=`ht_user`.`ht_number` AND `ht_user`.`ht_user_status_p2`='Проверен'
-		WHERE `cross_check`.`checker_id`='".$user_vk_id."' AND `cross_check`.`ht_num`='".$htNumber."'
-		LIMIT 1;
+$stmt = $pdo->prepare("SELECT `cross_check`.`ht_num`, `cross_check`.`ht_status`, `cross_check`.`cc_check_date`, `cross_check`.`cc_check_time`, 
+	`ht_user`.`ht_user_checker`, `ht_user`.`ht_number`
+	FROM `cross_check` 
+	LEFT JOIN `ht_user` ON `cross_check`.`curator_vk_id`=`ht_user`.`ht_user_checker` 
+	AND `cross_check`.`ht_num`=`ht_user`.`ht_number` AND `ht_user`.`ht_user_status_p2`='Проверен'
+	WHERE `cross_check`.`checker_id`=:user_vk_id AND `cross_check`.`ht_num`=:ht_number
+	LIMIT 1;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
-$stmn->execute(['ht_number' => $in->htNumber]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
-$crossCheck = $stmn->fetch(PDO::FETCH_ASSOC);
+$stmt->execute([
+	'ht_number' => $in->htNumber,
+	'$user_vk_id' => $user_id,
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
+$crossCheck = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
 $crossCheck = [
