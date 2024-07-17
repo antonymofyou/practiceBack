@@ -186,7 +186,7 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string
 	}
 	in.DataType = DataTypeRole
 	in.Data = userRole
-	userChannel <- in.MakeResponse(in, "")
+	conn.WriteMessage(websocket.TextMessage, in.MakeResponse(in, ""))
 
 	for {
 		_, msg, err := conn.ReadMessage()
