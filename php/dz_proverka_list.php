@@ -93,9 +93,25 @@ $stmt->closeCursor(); unset($stmt);
 //--------------------------------Получение списка пользователей
 $for_curator='';
 if ($user_type == 'Куратор') {
-	$forCurator="AND (`users`.`user_curator`='".$user_id."' OR `users`.`user_curator_dz`='".$user_id."')  ";//Добавляем выдачу только учеников куратора, и авторитарных
+	$query = "SELECT `users`.`user_name`, `users`.`user_surname`, `users`.`user_curator`, `users`.`user_vk_id`, `users`.`user_blocked`, `users`.`user_tarif_num`, 
+		CONCAT(  `curators`.`user_surname` ,  ' ', `curators`.`user_name` ) AS  `curator`, 
+		IF(`ht_user`.`ht_user_status_p2` IN('Готово','Самопров'),0,1) as `status_gotovo`,
+		`ht_user_date_p1`, `ht_user`.`ht_user_time_p1`, `ht_user_date_p2`, `ht_user`.`ht_user_time_p2`, `ht_user`.`ht_user_maxballov_p1`, `ht_user`.`ht_user_maxballov_p2`, `ht_user`.`ht_user_ballov_p1`,
+		`ht_user`.`ht_user_ballov_p2`, `ht_user`.`ht_user_status_p1`, `ht_user`.`ht_user_status_p2`
+		FROM `users`
+		LEFT JOIN  `users` AS  `curators` ON  (`users`.`user_curator` =  `curators`.`user_vk_id`  AND (`users`.`user_curator_dz` IS NULL OR `users`.`user_curator_dz`=0)) OR `users`.`user_curator_dz`=`curators`.`user_vk_id`
+		LEFT JOIN `ht_user` ON `users`.`user_vk_id`=`ht_user`.`user_id` AND `ht_user`.`ht_number`=:ht_number
+		WHERE `users`.`user_type` IN ('Частичный','Интенсив','Админ', 'Куратор') AND (`users`.`user_curator`=:user_vk_id OR `users`.`user_curator_dz`=:user_vk_id)
+		AND (`users`.`user_blocked`='0' OR  `users`.`user_blocked` IS NULL)
+		ORDER BY `curator` DESC,`users`.`user_tarif_num` DESC, `status_gotovo`, `ht_user`.`ht_user_status_p2` ASC, `ht_user`.`ht_user_date_p2`, `ht_user`.`ht_user_time_p2`, 
+		`ht_user`.`ht_user_status_p1` ASC, `users`.`user_blocked`, `users`.`user_surname`";//Добавляем выдачу только учеников куратора, и авторитарных "AND (`users`.`user_curator`='".$user_id."' OR `users`.`user_curator_dz`='".$user_id."')"
+	$params = [
+		'user_vk_id' => $user_vk_id,
+		'ht_number' => $in->htNumber,
+	];
 }
-$stmt->prepare("SELECT `users`.`user_name`, `users`.`user_surname`, `users`.`user_curator`, `users`.`user_vk_id`, `users`.`user_blocked`, `users`.`user_tarif_num`, 
+else{
+	$query = "SELECT `users`.`user_name`, `users`.`user_surname`, `users`.`user_curator`, `users`.`user_vk_id`, `users`.`user_blocked`, `users`.`user_tarif_num`, 
 	CONCAT(  `curators`.`user_surname` ,  ' ', `curators`.`user_name` ) AS  `curator`, 
 	IF(`ht_user`.`ht_user_status_p2` IN('Готово','Самопров'),0,1) as `status_gotovo`,
 	`ht_user_date_p1`, `ht_user`.`ht_user_time_p1`, `ht_user_date_p2`, `ht_user`.`ht_user_time_p2`, `ht_user`.`ht_user_maxballov_p1`, `ht_user`.`ht_user_maxballov_p2`, `ht_user`.`ht_user_ballov_p1`,
@@ -103,15 +119,16 @@ $stmt->prepare("SELECT `users`.`user_name`, `users`.`user_surname`, `users`.`use
 	FROM `users`
 	LEFT JOIN  `users` AS  `curators` ON  (`users`.`user_curator` =  `curators`.`user_vk_id`  AND (`users`.`user_curator_dz` IS NULL OR `users`.`user_curator_dz`=0)) OR `users`.`user_curator_dz`=`curators`.`user_vk_id`
 	LEFT JOIN `ht_user` ON `users`.`user_vk_id`=`ht_user`.`user_id` AND `ht_user`.`ht_number`=:ht_number
-	WHERE `users`.`user_type` IN ('Частичный','Интенсив','Админ', 'Куратор') :for_curator
+	WHERE `users`.`user_type` IN ('Частичный','Интенсив','Админ', 'Куратор')
 	AND (`users`.`user_blocked`='0' OR  `users`.`user_blocked` IS NULL)
 	ORDER BY `curator` DESC,`users`.`user_tarif_num` DESC, `status_gotovo`, `ht_user`.`ht_user_status_p2` ASC, `ht_user`.`ht_user_date_p2`, `ht_user`.`ht_user_time_p2`, 
-	`ht_user`.`ht_user_status_p1` ASC, `users`.`user_blocked`, `users`.`user_surname`
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
-$stmt->execute([
-	'for_curator' => $forCurator,
-	'ht_number' => $in->htNumber,
-]) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (1)');
+	`ht_user`.`ht_user_status_p1` ASC, `users`.`user_blocked`, `users`.`user_surname`";
+	$params = [
+		'ht_number' => $in->htNumber,
+	];
+}
+$stmt->prepare($query) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
+$stmt->execute($params) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (1)');
 if($stmt->rowCount() == 0) $out->make_wrong_resp("Ни один пользователь не был найден для задания [ID задания: {$in->htNumber}]");
 
 $users = [];
