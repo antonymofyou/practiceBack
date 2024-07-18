@@ -20,8 +20,6 @@ type User struct {
 	BnBalance           sql.NullInt64
 }
 
-var CurrentUser *User // экспортируемая переменная, которая инициализируется внутри функции CheckUser
-
 // AuthError структура ошибки с релизацией интерфейса error (чтобы ее можно было возвращать как тип error)
 type AuthError struct {
 	err     string
@@ -43,10 +41,10 @@ func newAuthError(error string, success string) *AuthError {
 // CheckUser проверка пользователя на основе signature и device
 // mainRequestClass - основной класс запроса, где указаны Signature и Device текущего запроса
 // data - данные, на основе которых нужно проверить, соответствует ли им Signature и Device (нужно передать полностью класс запроса для текущего вызванного метода)
-func CheckUser(mainRequestClass *api_root_classes.MainRequestClass, data interface{}) *AuthError {
+func CheckUser(mainRequestClass *api_root_classes.MainRequestClass, data interface{}) (*User, *AuthError) {
 	_, err := strconv.Atoi(mainRequestClass.Device) // приводим device к строке
 	if err != nil {
-		return newAuthError("параметр 'device' задан некорретно", api_root_classes.ErrorResponse)
+		return nil, newAuthError("параметр 'device' задан некорретно", api_root_classes.ErrorResponse)
 	}
 
 	// получаем пользователя, токен (и другие данные) по девайсу
@@ -55,21 +53,21 @@ func CheckUser(mainRequestClass *api_root_classes.MainRequestClass, data interfa
 		mainRequestClass.Device,
 	)
 	if err != nil {
-		return newAuthError("ошибка БД: "+err.Error(), api_root_classes.ErrorResponse)
+		return nil, newAuthError("ошибка БД: "+err.Error(), api_root_classes.ErrorResponse)
 	}
 	defer rows.Close()
 
 	if !rows.Next() { // проверяем наличие результата
-		return newAuthError("токен не найден", api_root_classes.LogoutResponse)
+		return nil, newAuthError("токен не найден", api_root_classes.LogoutResponse)
 	}
 
 	// биндим результат последовательно к каждому полю структуры (для этого передаем указатель на поле)
-	CurrentUser = &User{}
-	rows.Scan(&CurrentUser.UserVkId, &CurrentUser.NasotkuToken, &CurrentUser.UserType, &CurrentUser.UserBlocked, &CurrentUser.UserName, &CurrentUser.UserStartCourseDate, &CurrentUser.BnBalance)
+	currentUser := &User{}
+	rows.Scan(&currentUser.UserVkId, &currentUser.NasotkuToken, &currentUser.UserType, &currentUser.UserBlocked, &currentUser.UserName, &currentUser.UserStartCourseDate, &currentUser.BnBalance)
 
 	// проверка подписи
-	if !mainRequestClass.CheckSignature(data, CurrentUser.NasotkuToken) {
-		return newAuthError("неверная подпись запроса", api_root_classes.LogoutResponse)
+	if !mainRequestClass.CheckSignature(data, currentUser.NasotkuToken) {
+		return nil, newAuthError("неверная подпись запроса", api_root_classes.LogoutResponse)
 	}
 	// обновляем время последнего использования токена
 	_, err = db.Db.Exec(
@@ -77,29 +75,29 @@ func CheckUser(mainRequestClass *api_root_classes.MainRequestClass, data interfa
 		mainRequestClass.Device,
 	)
 	if err != nil {
-		return newAuthError("ошибка БД: "+err.Error(), api_root_classes.ErrorResponse)
+		return nil, newAuthError("ошибка БД: "+err.Error(), api_root_classes.ErrorResponse)
 	}
 
 	// проверяем пользователя на блокировку
-	if CurrentUser.UserBlocked == 1 {
-		return newAuthError("Пользователь заблокирован", api_root_classes.LogoutResponse)
+	if currentUser.UserBlocked == 1 {
+		return nil, newAuthError("Пользователь заблокирован", api_root_classes.LogoutResponse)
 	}
 
 	// проверяем тип пользователя
 	allowedUserTypes := []string{"Частичный", "Интенсив", "Куратор", "Админ", "Демо", "Пакетник"} // разрешенные типы пользователей
-	if !slices.Contains(allowedUserTypes, CurrentUser.UserType) {
-		return newAuthError("Неправильный тип пользователя", api_root_classes.LogoutResponse)
+	if !slices.Contains(allowedUserTypes, currentUser.UserType) {
+		return nil, newAuthError("Неправильный тип пользователя", api_root_classes.LogoutResponse)
 	}
 
 	// доп. проверка для пользователя с типом "Интенсив"
-	if CurrentUser.UserType == "Интенсив" {
+	if currentUser.UserType == "Интенсив" {
 		startCourse, _ := time.Parse(time.Layout, "2023-04-28") // переводим строковую дату в структуру Time (время начала курса для "Интенсив")
 
 		// если текущая дата еще не дошла до времени старта курса - возвращаем ошибку
 		if time.Now().Before(startCourse) {
-			return newAuthError("Доступ откроется 28 апреля", api_root_classes.ErrorResponse)
+			return nil, newAuthError("Доступ откроется 28 апреля", api_root_classes.ErrorResponse)
 		}
 	}
 
-	return nil
+	return currentUser, nil
 }

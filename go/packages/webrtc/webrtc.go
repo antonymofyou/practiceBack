@@ -102,8 +102,9 @@ func RoomHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//--------------------------------Проверка пользователя
-	if err := auth.CheckUser(in, in); err != nil {
-		errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), err.Success))
+	currentUser, errCheckUser := auth.CheckUser(in, in)
+	if errCheckUser != nil {
+		errorJsonResponse(conn, out.MakeWrongResponse(errCheckUser.Error(), errCheckUser.Success))
 		return
 	}
 
@@ -216,7 +217,7 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string
 		}
 
 		// проверка пользователя
-		if err := auth.CheckUser(in.MainRequestClass, in); err != nil {
+		if _, err := auth.CheckUser(in.MainRequestClass, in); err != nil {
 			userChannel <- out.MakeWrongResponse(err.Error(), err.Success)
 			rd.Unlock()
 			continue
