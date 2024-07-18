@@ -12,8 +12,6 @@ class HomeTaskDzProverkaList extends MainRequestClass {
 	
 }
 $in = new HomeTaskDzProverkaList();
-$in->from_json(file_get_contents('php://input'));
-
 // класс ответа
 class HomeTaskDzProverkaListResponse extends MainResponseClass {
 	/*
@@ -74,20 +72,20 @@ try {
 }
 
 //--------------------------------Проверка пользователя
-require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/manager_check_user.inc.php';
+//require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/manager_check_user.inc.php';
 if (!(in_array($user_type, ['Админ', 'Куратор']))) $out->make_wrong_resp('Нет доступа');
 
 //--------------------------------Валидация $in->htNumber
-if (((string) (int) $in->htNumber) !== ((string) $in->htNumber) || (int) $in->vacancyId <= 0) $out->make_wrong_resp("Параметр 'vacancyId' задан некорректно или отсутствует");
+if (((string) (int) $in->htNumber) !== ((string) $in->htNumber) || (int) $in->htNumber <= 0) $out->make_wrong_resp("Параметр 'vacancyId' задан некорректно или отсутствует");
 $stmt = $pdo->prepare("
-    SELECT `id`
+    SELECT `ht_number`
     FROM `home_tasks`
-    WHERE `id` = :id
+    WHERE `ht_number` = :ht_number
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса');
 $stmt->execute([
-    'id' => $in->htNumber
+    'ht_number' => $in->htNumber
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса');
-if ($stmt->rowCount() == 0) $out->make_wrong_resp("Домашнее задание с ID {$in->htNumber} не найдена");
+if ($stmt->rowCount() == 0) $out->make_wrong_resp("Домашнее задание с номером {$in->htNumber} не найдена");
 $stmt->closeCursor(); unset($stmt);
 
 //--------------------------------Получение списка пользователей
@@ -127,9 +125,9 @@ else{
 		'ht_number' => $in->htNumber,
 	];
 }
-$stmt->prepare($query) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
+$stmt = $pdo->prepare($query) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
 $stmt->execute($params) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (1)');
-if($stmt->rowCount() == 0) $out->make_wrong_resp("Ни один пользователь не был найден для задания [ID задания: {$in->htNumber}]");
+if($stmt->rowCount() == 0) $out->make_wrong_resp("Ни один пользователь не был найден для задания [Номер задания: {$in->htNumber}] ");
 
 $users = [];
 while ($user = $stmt->fetch(PDO::FETCH_ASSOC)){
@@ -181,7 +179,7 @@ $stmt = $pdo->prepare("SELECT `cross_check`.`ht_num`, `cross_check`.`ht_status`,
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
 $stmt->execute([
 	'ht_number' => $in->htNumber,
-	'$user_vk_id' => $user_id,
+	'user_vk_id' => $user_vk_id,
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
 $crossCheck = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
