@@ -1,6 +1,7 @@
 package webrtc
 
 import (
+	"encoding/json"
 	"errors"
 	"github.com/gorilla/websocket"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"nasotku/includes/auth"
 	"nasotku/includes/db"
 	"net/http"
+	"strconv"
 	"sync"
 )
 
@@ -30,6 +32,7 @@ type WebrtcSignalingResponse struct {
 // типы данных, которые принимают и возвращают классы запросов (dataType)
 const (
 	DataTypeRole                    = "ROLE"
+	DataTypeTrainInfo               = "TRAIN_INFO"
 	DataTypeOffer                   = "OFFER"
 	DataTypeAnswer                  = "ANSWER"
 	DataTypeIceCandidates           = "ICE_CANDIDATE"
@@ -46,9 +49,20 @@ type roomDataStorage struct {
 }
 
 type roomInfoFromDB struct {
-	ID              int    `sql:"room_id"`
-	initiatorDevice string `sql:"initiator_device"`
-	responderDevice string `sql:"responder_device"`
+	ID              int
+	userInitiator   int
+	userResponder   int
+	initiatorDevice string
+	responderDevice string
+}
+
+type trainInfoFromDB struct {
+	userQuestioner     int
+	userAnswerer       int
+	userQuestionerName string
+	userAnswererName   string
+	question           string
+	answer             string
 }
 
 // Структура для хранения информации о комнате
@@ -108,10 +122,16 @@ func RoomHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// как будто комнату из БД получили
-	roomInfoDB, err := getRoomByDevice(in.Device)
+	// получаем из базы информацию о тренировке и комнате
+	trainInfo, roomInfoDB, err := getTrainAndRoomByUser(currentUser.UserVkId)
 	if err != nil {
 		errorJsonResponse(conn, out.MakeWrongResponse(err.Error(), api_root_classes.ErrorResponse))
+		return
+	}
+
+	// проверка на OTHER_DEVICE
+	if roomInfoDB.initiatorDevice != in.Device && roomInfoDB.responderDevice != in.Device {
+		errorJsonResponse(conn, out.MakeWrongResponse("тренировка начата, но текущее устройство не равено тому, с которого она начата (OTHER_DEVICE)", api_root_classes.ErrorResponse))
 		return
 	}
 
@@ -135,6 +155,71 @@ func RoomHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		// Если комната найдена в rds и это не OTHER_DEVICE, значит подключился второй юзер. Меняем статус.
 		rds.rooms[roomInfoDB.ID].status = RoomStatusWaitOffer
+
+		// когда оба пользователя подключились, отправляем им данные о тренировке
+
+		// сообщение для спрашивающего в тренировке
+		trainForQuestioner := map[string]string{
+			"status":             "ANSWERING",
+			"userQuestioner":     strconv.Itoa(trainInfo.userQuestioner),
+			"userAnswerer":       strconv.Itoa(trainInfo.userAnswerer),
+			"userNameQuestioner": trainInfo.userQuestionerName,
+			"userNameAnswerer":   trainInfo.userAnswererName,
+			"role":               "questioner",
+			"questionText":       trainInfo.question,
+			"questionAnswer":     trainInfo.answer,
+		}
+		trainJsonForQuestioner, _ := json.Marshal(trainForQuestioner)
+		outTrainForQuestioner := &WebrtcSignalingResponse{
+			MainResponseClass: &api_root_classes.MainResponseClass{
+				API_root_class: &api_root_classes.API_root_class{Signature: ""},
+			},
+			DataType: DataTypeTrainInfo,
+			Data:     string(trainJsonForQuestioner),
+		}
+		outTrainForQuestionerBytes := outTrainForQuestioner.MakeResponse(outTrainForQuestioner, "")
+
+		// сообщение для ответчика тренировки
+		trainForAnswerer := map[string]string{
+			"status":             "ANSWERING",
+			"userQuestioner":     strconv.Itoa(trainInfo.userQuestioner),
+			"userAnswerer":       strconv.Itoa(trainInfo.userAnswerer),
+			"userNameQuestioner": trainInfo.userQuestionerName,
+			"userNameAnswerer":   trainInfo.userAnswererName,
+			"role":               "answerer",
+			"questionText":       trainInfo.question,
+		}
+		trainJsonForAnswerer, _ := json.Marshal(trainForAnswerer)
+		outTrainForAnswerer := &WebrtcSignalingResponse{
+			MainResponseClass: &api_root_classes.MainResponseClass{
+				API_root_class: &api_root_classes.API_root_class{Signature: ""},
+			},
+			DataType: DataTypeTrainInfo,
+			Data:     string(trainJsonForAnswerer),
+		}
+		outTrainForAnswererBytes := outTrainForQuestioner.MakeResponse(outTrainForAnswerer, "")
+
+		// находим канал для спрашивающего
+		var userQuestionerChannel chan []byte
+		if rds.rooms[roomInfoDB.ID].userInitiator == trainInfo.userQuestioner {
+			userQuestionerChannel = rds.rooms[roomInfoDB.ID].initiatorChannel
+		} else {
+			userQuestionerChannel = rds.rooms[roomInfoDB.ID].responderChannel
+		}
+
+		// находим канал для отвечающего
+		var userAnswererChannel chan []byte
+		if rds.rooms[roomInfoDB.ID].userInitiator == trainInfo.userAnswerer {
+			userAnswererChannel = rds.rooms[roomInfoDB.ID].initiatorChannel
+		} else {
+			userAnswererChannel = rds.rooms[roomInfoDB.ID].responderChannel
+		}
+
+		// отложенный вызов отправки данных. Данные отправятся в канал после запуска горутин в конце хендлера
+		defer func() {
+			userQuestionerChannel <- outTrainForQuestionerBytes
+			userAnswererChannel <- outTrainForAnswererBytes
+		}()
 	}
 
 	// Ставим соответствующий флажок, что подключился либо инициатор либо респондер и заодно определяем,
@@ -149,6 +234,28 @@ func RoomHandler(w http.ResponseWriter, r *http.Request) {
 		userChannel = rds.rooms[roomInfoDB.ID].responderChannel
 		log.Println("responder ID", roomInfoDB.responderDevice, "connected")
 	}
+	var userRole string
+	if in.Device == rds.rooms[roomInfoDB.ID].initiatorDevice {
+		userRole = "initiator"
+	} else if in.Device == rds.rooms[roomInfoDB.ID].responderDevice {
+		userChannel = rds.rooms[roomInfoDB.ID].responderChannel
+		userRole = "responder"
+	}
+
+	// информируем пользователя о том, какая у него роль
+	outRole := &WebrtcSignalingResponse{
+		MainResponseClass: &api_root_classes.MainResponseClass{
+			API_root_class: &api_root_classes.API_root_class{Signature: ""},
+		},
+		DataType: DataTypeRole,
+		Data:     userRole,
+	}
+	outRoleBytes := outRole.MakeResponse(outRole, "")
+
+	// отложенный вызов отправки данных. Данные отправятся в канал после иницилазции горутин в конце хендлера
+	defer func() {
+		userChannel <- outRoleBytes
+	}()
 
 	// Если хоть один юзер отключился, отключаем всех.
 	exitFunc := func() {
@@ -170,31 +277,17 @@ func readMessagesFromWebsocket(conn *websocket.Conn, rd *roomData, device string
 
 	// определяем канал текущего пользователя для удобного обращения к нему без if'ов
 	var userChannel chan []byte
-	var userRole string
 	if device == rd.initiatorDevice {
 		userChannel = rd.initiatorChannel
-		userRole = "initiator"
 	} else if device == rd.responderDevice {
 		userChannel = rd.responderChannel
-		userRole = "responder"
 	}
-
-	// информируем пользователя о том, какая у него роль
-	in := &WebrtcSignalingRequest{
-		MainRequestClass: &api_root_classes.MainRequestClass{
-			API_root_class: &api_root_classes.API_root_class{Signature: ""},
-		},
-	}
-	in.DataType = DataTypeRole
-	in.Data = userRole
-	conn.WriteMessage(websocket.TextMessage, in.MakeResponse(in, ""))
 
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			return // разорвано соединение, конец горутины
 		}
-		// TODO: добавить проверку, не закрыты ли каналы
 
 		rd.Lock()
 
@@ -354,7 +447,42 @@ func removeAllConnections(conn *websocket.Conn, roomID int, rdStorage *roomDataS
 }
 
 // функция получения информации о комнате из БД
-func getRoomByDevice(device string) (*roomInfoFromDB, error) {
+func getTrainAndRoomByUser(userVkId int) (*trainInfoFromDB, *roomInfoFromDB, error) {
+	// получаем сессию пользователя по device (пользователь может быть как инициатором, так и респондером)
+	rows, err := db.Db.Query(`
+		SELECT wrtc_sessions.id AS wrtc_session_id, wrtc_sessions.user_initiator, wrtc_sessions.user_responder, wrtc_sessions.user_initiator_device, wrtc_sessions.user_responder_device,
+			train_zachet_verbal_chat_users.user_questioner, train_zachet_verbal_chat_users.user_answerer, zachet_train.question, zachet_train.answer
+		FROM train_zachet_verbal_chat_users
+		INNER JOIN zachet_train ON zachet_train.id = train_zachet_verbal_chat_users.question_id
+		INNER JOIN wrtc_sessions ON wrtc_sessions.id = train_zachet_verbal_chat_users.wrtc_session_id
+		WHERE user_questioner = ?
+        	OR user_answerer = ?;
+		`,
+		userVkId,
+		userVkId,
+	)
+	defer rows.Close()
+	if err != nil {
+		return nil, nil, errors.New("ошибка БД: " + err.Error())
+	}
+
+	if !rows.Next() { // проверяем наличие результата
+		return nil, nil, errors.New("тренировка для пользователя не найдена")
+	}
+
+	// биндим результат последовательно к каждому полю структуры (для этого передаем указатель на поле)
+	roomInfo := &roomInfoFromDB{}
+	trainInfo := &trainInfoFromDB{}
+	rows.Scan(
+		&roomInfo.ID, &roomInfo.userInitiator, &roomInfo.userResponder, &roomInfo.initiatorDevice, &roomInfo.responderDevice,
+		&trainInfo.userQuestioner, &trainInfo.userAnswerer, &trainInfo.question, &trainInfo.answer,
+	)
+
+	return trainInfo, roomInfo, nil
+}
+
+// функция получения информации о тренировке из БД
+func getTrainInfoBySessionId(device string) (*roomInfoFromDB, error) {
 	// получаем сессию пользователя по device (пользователь может быть как инициатором, так и респондером)
 	rows, err := db.Db.Query(
 		"SELECT `id`, `user_initiator_device`, `user_responder_device` FROM `wrtc_sessions` WHERE `user_initiator_device` = ? OR `user_responder_device` = ? LIMIT 1;",
