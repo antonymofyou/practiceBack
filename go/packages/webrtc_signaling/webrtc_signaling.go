@@ -1,4 +1,4 @@
-package webrtc
+package webrtc_signaling
 
 import (
 	"encoding/json"

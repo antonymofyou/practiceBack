@@ -3,7 +3,7 @@ package routes
 import (
 	"fmt"
 	"nasotku/packages/users"
-	"nasotku/packages/webrtc"
+	"nasotku/packages/webrtc_signaling"
 	"nasotku/packages/ws"
 	"net/http"
 )
@@ -23,5 +23,5 @@ func InitRoutes() {
 	http.HandleFunc("/go/ws/echo", ws.Echo)
 
 	// роут вебсокета для тренировки устного зачёта 1 на 1
-	http.HandleFunc("/go/webrtc/ws", webrtc.RoomHandler)
+	http.HandleFunc("/go/train_zachet_verbal_chat/ws", webrtc_signaling.RoomHandler)
 }
