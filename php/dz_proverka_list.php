@@ -72,11 +72,11 @@ try {
 }
 
 //--------------------------------Проверка пользователя
-//require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/manager_check_user.inc.php';
+require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/check_user.inc.php';
 if (!(in_array($user_type, ['Админ', 'Куратор']))) $out->make_wrong_resp('Нет доступа');
 
 //--------------------------------Валидация $in->htNumber
-if (((string) (int) $in->htNumber) !== ((string) $in->htNumber) || (int) $in->htNumber <= 0) $out->make_wrong_resp("Параметр 'vacancyId' задан некорректно или отсутствует");
+if (((string) (int) $in->htNumber) !== ((string) $in->htNumber) || (int) $in->htNumber <= 0) $out->make_wrong_resp("Параметр 'htNumber' задан некорректно или отсутствует");
 $stmt = $pdo->prepare("
     SELECT `ht_number`
     FROM `home_tasks`
