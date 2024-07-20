@@ -2,8 +2,8 @@
 
 header('Content-Type: application/json; charset=utf-8');
 
-require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
-require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/config_api.inc.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/root_classes.inc.php';
 
 //класс запроса
 class SetHometask extends MainRequestClass { 
@@ -11,20 +11,20 @@ class SetHometask extends MainRequestClass {
 
     public $ht = []; /* словарь с данными для обновления
 
-    htNumsP1
-    htNumsP1Dop
-    htNumsP2
-    typeP1
-    addOtherTasksP1
-    addOtherTasksP2
-    htStatus
-    htDeadline
-    htDeadlineTime
-    htDeadlineCur
-    htComment
-    isProbnik
-    timerSecondsP1
-    timerSecondsP2
+    htNumsP1 INT Количество вопросов из первой части
+    htNumsP1Dop INT Количество дополнительных вопросов из первой части
+    htNumsP2 INT Количество вопросов из второй части
+    typeP1 TEXT Тип вопросов: Вопросыизурона или КаквЕГЭ
+    addOtherTasksP1 BOOLEAN Добавить задания Ч1 из других уроков в случае нехватки
+    addOtherTasksP2 BOOLEAN Добавить задания Ч2 из других уроков в случае нехватки
+    htStatus TEXT Статус задания: Новое, Выполнение, Проверка или Завершено
+    htDeadline DATE День дедлайна
+    htDeadlineTime TIME Время дедлайна 
+    htDeadlineCur DATETIME Дедлайн проверки кураторов 
+    htComment TEXT 
+    isProbnik BOOLEAN Является ли пробником 
+    timerSecondsP1 INT Времени на Ч1 минут
+    timerSecondsP2 INT Времени на Ч2 минут
 
     */
 
@@ -40,31 +40,39 @@ class SetHometask extends MainRequestClass {
 }
 
 $in = new SetHometask();
-$in->from_json(file_get_contents('php://in'));
+$in->from_json(file_get_contents('php://input'));
+
+
+
 
 //класс ответа
-class SetHometaskResponse extends MainRequestClass {
-    public $createdHt = [];  /* Словарь созданной вакансии
-    - htNumber - номер дз
-    - createdAt - дата создания дз
+class SetHometaskResponse extends MainResponseClass {
+
+    public $homeTask = []; /* Словарь с данными дз
+
+    htNumsP1 INT Количество вопросов из первой части
+    htNumsP1Dop INT Количество дополнительных вопросов из первой части
+    htNumsP2 INT Количество вопросов из второй части
+    typeP1 TEXT Тип вопросов: Вопросыизурона или КаквЕГЭ
+    addOtherTasksP1 BOOLEAN Добавить задания Ч1 из других уроков в случае нехватки
+    addOtherTasksP2 BOOLEAN Добавить задания Ч2 из других уроков в случае нехватки
+    htStatus TEXT Статус задания: Новое, Выполнение, Проверка или Завершено
+    htDeadline DATE День дедлайна
+    htDeadlineTime TIME Время дедлайна 
+    htDeadlineCur DATETIME Дедлайн проверки кураторов 
+    htComment TEXT 
+    isProbnik BOOLEAN Является ли пробником 
+    timerSecondsP1 INT Времени на Ч1 минут
+    timerSecondsP2 INT Времени на Ч2 минут
+
     */
 
-    public $getHt = []; /* Словарь существующей вакансии
+    public $questions = []; /* Словарь с данными о количестве вопросов
 
-    htNumsP1
-    htNumsP1Dop
-    htNumsP2
-    typeP1
-    addOtherTasksP1
-    addOtherTasksP2
-    htStatus
-    htDeadline
-    htDeadlineTime
-    htDeadlineCur
-    htComment
-    isProbnik
-    timerSecondsP1
-    timerSecondsP2
+    numsP1 INT Количество доступных вопросов 1 части
+    numsP1Dop INT Количество доступных дополнительных вопросов 1 части
+    numsP2 INT Количество доступных вопросов 2 части
+
     */
 
 }
@@ -82,7 +90,7 @@ try {
 }
 
 //Проверка пользователя
-require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/manager_check_user.inc.php';
+//require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/manager_check_user.inc.php';
 
 /*
 
@@ -117,47 +125,120 @@ if(isset($in->ht['htNumsP1'])) {
 
 
 //Формирование ответа $action. В зависимости от значения $action выбирается соответствующий алгоритм обработки
-switch($action)
+switch($in->action)
 {
     case "create":
-        $out->success = '1';
-        $out->htNumber = [
-            'htNumber' => (string) $ht['htNumber']
-        ];
-    break;
+       
+        $stmt = $pdo->prepare("
+        INSERT INTO home_tasks SET ht_number = NULL
+        
 
+        ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса');
+        $stmt->execute() or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (11)');
+        $stmt->closeCursor(); unset($stmt);
+
+        $in->htNumber = $pdo->lastInsertId(); if(!$in->htNumber) $out->make_wrong_resp('Произошла ошибка при создании задания');
+
+        $out->message = "Создание или обновление задания"; //Сообщаем о назначении запроса в вывод
+        //Код выполняется дальше
     case "update":
+        
 
-    break;
-
-    case "delete":
-    break;
-
-    case "get":
+        
+    case 'get':
 
         //Валидация htNumber
         if (((string) (int) $in->htNumber) !== ((string) $in->htNumber) || (int) $in->htNumber <= 0) $out->make_wrong_resp("Параметр 'htNumber' задан некорректно или отсутствует");
             $stmt = $pdo->prepare("
-            SELECT `ht_number`
-            FROM `home_tasks`
-            WHERE `ht_number` = :htNumber
+            SELECT ht_number
+            FROM home_tasks
+            WHERE ht_number = :htNumber
             ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
             $stmt->execute([
-                'id' => $in->htNumber
+                'htNumber' => $in->htNumber
             ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
-            if ($stmt->rowCount() == 0) $out->make_wrong_resp("Домашнее задание {$in->htNumber} не найдено");
+            if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Домашнее задание под номером {$in->htNumber} не найдено");
                 $stmt->closeCursor(); unset($stmt);
 
-        //Получение всех данных
+        //Получение всех данных о задании из таблицы home_tasks
         $stmt = $pdo->prepare("
-            SELECT * FROM 'home_tasks' WHERE 'ht_number' = :htNumber
-        ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса');
+        SELECT *,
+        DATE_FORMAT('ht_deadline_cur', '%Y-%m-%dT%H:%i') AS htDeadlineCur
+        FROM home_tasks 
+        WHERE ht_number = :htNumber
+        ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
         $stmt->execute([
-            'htNumber' => $in->htNumber,
-        ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса');
+            'htNumber' => $in->htNumber
+        ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
         if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
-        $getHt = $stmt->fetch(PDO::FETCH_ASSOC);
+        $homeTask = $stmt->fetch(PDO::FETCH_ASSOC);
         $stmt->closeCursor(); unset($stmt);
+
+        //Получаем данные о вопросах первой части из таблицы questions
+        $stmt = $pdo->prepare("
+        SELECT COUNT(1) as numsP1
+        FROM questions
+        WHERE q_lesson_num = :htNumber 
+        AND q_public = 1 
+        AND selfmade = 0
+        ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса(3)');
+        $stmt->execute([
+            'htNumber' => $in->htNumber
+        ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса(3)');
+        //if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
+        $questions = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt->closeCursor(); unset($stmt);
+
+        //Получаем данные о вопросах из второй части из таблицы questions2
+        $stmt = $pdo->prepare("
+        SELECT COUNT(1) as numsP2
+        FROM questions2
+        WHERE q2_lesson_num = :htNumber 
+        AND q2_public = 1 
+        ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса(3)');
+        $stmt->execute([
+            'htNumber' => $in->htNumber
+        ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса(3)');
+        //if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
+        $questions += $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt->closeCursor(); unset($stmt);
+
+        //Дополнительные вопросы к первой части из таблицы questions
+        $stmt = $pdo->prepare(" 
+        SELECT COUNT(1) as numsP1Dop
+        FROM questions
+        WHERE q_lesson_num = :htNumber 
+        AND q_public = 1 
+        AND selfmade = 1
+        ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса(3)');
+        $stmt->execute([
+            'htNumber' => $in->htNumber
+        ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса(3)');
+        //if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
+        $questions += $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt->closeCursor(); unset($stmt);
+
+        //Цикл формирует ответ словарём $homeTask из всех полученных данных
+        foreach($homeTask as $key => $value) 
+        {
+            $out->homeTask += [
+                $key => $value
+            ];
+        };
+
+        //Дополнительно добавляем в ответ количество вопросов
+        foreach($questions as $key => $value) 
+        {
+            $out->questions += [
+                $key => $value
+            ];
+        }
+        $out->success = "1";
+
+    break;
+
+    case "delete":
+    
     break;
 
     default: $out->make_wrong_resp("Некорреткный 'action'");
