@@ -53,10 +53,10 @@ if (!in_array($user_type, ['Админ', 'Куратор'])) $out->make_wrong_re
 
 //--------------------------------Получение домашних заданий не с номером 200
 $stmt = $pdo->prepare("
-        SELECT is_probnik, ht_number, type_p1, ht_nums_P1, ht_nums_P2, ht_deadline, ht_deadline_time, ht_status
-        FROM home_tasks
-        WHERE ht_number != :ht_number
-        ORDER BY ht_deadline"
+        SELECT `is_probnik`, `ht_number`, `type_p1`, `ht_nums_P1`, `ht_nums_P2`, `ht_deadline`, `ht_deadline_time`, `ht_status`
+        FROM `home_tasks`
+        WHERE `ht_number` != :ht_number
+        ORDER BY `ht_deadline`"
         ) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
 
 $htNumber = 200;
@@ -81,10 +81,10 @@ foreach ($notNumber200Tasks as $row){
 
 //--------------------------------Получение домашних заданий с номером 200
 $stmt = $pdo->prepare("
-        SELECT is_probnik, ht_number, type_p1, ht_nums_P1, ht_nums_P2, ht_deadline, ht_deadline_time, ht_status
-        FROM home_tasks
-        WHERE ht_number = :ht_number
-        ORDER BY ht_deadline"
+        SELECT `is_probnik`, `ht_number`, `type_p1`, `ht_nums_P1`, `ht_nums_P2`, `ht_deadline`, `ht_deadline_time`, `ht_status`
+        FROM `home_tasks`
+        WHERE `ht_number`= :ht_number
+        ORDER BY `ht_deadline`"
         ) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
 
 $htNumber = 200;
@@ -109,16 +109,16 @@ foreach ($number200Tasks as $row){
 
 //--------------------------------Формируем выдачу для перекрестной проверки
 $stmt = $pdo->prepare("
-    SELECT cross_check.ht_num, cross_check.ht_status, cross_check.cc_check_date, cross_check.cc_check_time,
-    ht_user.ht_user_checker, ht_user.ht_number
-    FROM cross_check
-    LEFT JOIN ht_user ON cross_check.curator_vk_id = ht_user.ht_user_checker
-    AND cross_check.ht_num = ht_user.ht_number AND ht_user.ht_user_status_p2 = 'Проверен'
-    LEFT JOIN home_tasks ON home_tasks.ht_number` = cross_check.ht_num
-    WHERE cross_check.checker_id = :user_id
-    AND (cross_check.ht_status = 0 OR cross_check.ht_status IS NULL)
-    AND DATEDIFF(CURDATE(), home_tasks.ht_deadline) > -3
-    GROUP BY cross_check.ht_num, cross_check.checker_id"
+    SELECT `cross_check`.`ht_num`, `cross_check`.`ht_status`, `cross_check`.`cc_check_date`, `cross_check`.`cc_check_time`,
+    `ht_user`.`ht_user_checker`, `ht_user`.`ht_number`
+    FROM `cross_check`
+    LEFT JOIN `ht_user` ON `cross_check`.`curator_vk_id` = `ht_user`.`ht_user_checker`
+    AND `cross_check`.`ht_num` = `ht_user`.`ht_number` AND `ht_user`.`ht_user_status_p2` = 'Проверен'
+    LEFT JOIN `home_tasks` ON `home_tasks`.`ht_number` = `cross_check`.`ht_num`
+    WHERE `cross_check`.`checker_id` = :user_id
+    AND (`cross_check`.`ht_status` = 0 OR `cross_check`.`ht_status` IS NULL)
+    AND DATEDIFF(CURDATE(), `home_tasks`.`ht_deadline`) > -3
+    GROUP BY `cross_check`.`ht_num`, `cross_check`.`checker_id`"
     ) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
 
 $stmt->execute(['user_id' => $user_vk_id]);
