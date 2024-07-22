@@ -280,6 +280,12 @@ if($in->action == "update"){
         $changes['ht_deadline_cur'] = $in->htUpdate['htDeadlineCur'];
     }
 
+    //htComment
+    if (isset($in->htUpdate['htComment'])) {
+        if (!is_string($in->htUpdate['htComment']) || (mb_strlen($htUpdate['htComment'] > 256))) $out->make_wrong_resp("Поле 'htComment' задано некорректно");
+        $changes['ht_comment'] = $in->htUpdate['htComment'];
+    }
+
     //isProbnik
     if (isset($in->htUpdate['isProbnik'])) {
         if (!in_array($in->htUpdate['isProbnik'], [0, 1])) $out->make_wrong_resp("Поле 'isProbnik' задано некорректно");
@@ -320,8 +326,20 @@ if($in->action == "update"){
 
 //Получение всех данных о задании из таблицы home_tasks
 $stmt = $pdo->prepare("
-    SELECT *,
-    DATE_FORMAT('ht_deadline_cur', '%Y-%m-%dT%H:%i') AS htDeadlineCur
+    SELECT ht_nums_p1 AS htNumsP1,
+    ht_nums_p1_dop AS htNumsP1Dop,
+    ht_nums_p2 AS htNumsP2,
+    type_p1 AS typeP1,
+    add_other_tasks_p1 AS addOtherTasksP1,
+    add_other_tasks_p2 AS addOtherTasksP2,
+    ht_status AS htStatus,
+    ht_deadline AS htDeadline,
+    ht_deadline_time AS htDeadlineTime,
+    DATE_FORMAT('ht_deadline_cur', '%Y-%m-%dT%H:%i') AS htDeadlineCur,
+    ht_comment AS htComment,
+    is_probnik AS isProbnik,
+    timer_seconds_p1 AS timerSecondsP1,
+    timer_seconds_p2 AS timerSecondsP2
     FROM home_tasks 
     WHERE ht_number = :htNumber
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4.2)');
