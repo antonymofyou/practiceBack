@@ -1,4 +1,4 @@
-<?php // Создание сообщения пользователем
+<?php // Получение обновленных сообщений
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -14,40 +14,18 @@ class UpdateMessagesAjax extends MainRequestClass {
 	
 }
 $in = new UpdateMessagesAjax();
-$in->from_json(file_get_contents('php://input'));
-
+//$in->from_json(file_get_contents('php://input'));
+$in->from_json('{
+    "device": "",
+    "signature": "sdfgsdfg"
+ }');
+$in->ticketId = '1';
+$in->lastMessId = '1';
+$user_vk_id = '1';
 // класс ответа
 class UpdateMessagesAjaxResponse extends MainResponseClass {
-	/*
-	* 	Словарь, который имеет следующие поля:
-	*     - ticketId - идентификатор заявки
-	*     - lessonNumber - номер урока
-	*     - taskNumber - номер задания
-	*     - type - тип заявки
-	*     - status - статус заявки
-	*     - questName - название вопроса
-	*     - userVkId - идентификатор пользователя, создавшего заявку
-	*     - importance - важность заявки
-	*     - whenMade - когда создана заявка
-	*     - whenChanged - когда отредактирована заявка
-	*/
-	public $ticketDz = []; // словарь с данными заявки
-	/*
-	* 	Массив словарей, каждый словарь имеет следующие поля:
-	*     - messId - идентификатор сообщения
-	*     - ticketId - идентификатор заявки
-	*     - userVkId - идентификатор пользователя
-	*     - comment - сообщение
-	*     - commentDtime - дата и время отправки сообщения
-	*     - messMaker - имя и фамилия отправителя сообщения
-	*/
-	public $ticketsMessDz = [];// массив словарей с данными сообщений по заявке
-	/*
-	* 	Словарь, который имеет следующие поля:
-	*     - ticketId - идентификатор заявки
-	*     - userVkId - идентификатор пользователя
-	*/
-	public $ticketDzUser = [];// массив словарей с данными сообщений по заявке
+
+	public $newMessages = [];// новые сообщения по заявке
 
 	public $lastMessId = ''; // идентификатор последнего сообщения
 }
@@ -66,15 +44,15 @@ try {
 }
 
 //--------------------------------Проверка пользователя
-require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/check_user.inc.php';
-if (!(in_array($user_type, ['Админ', 'Куратор']))) $out->make_wrong_resp('Нет доступа');
+//require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/check_user.inc.php';
+//if (!(in_array($user_type, ['Админ', 'Куратор']))) $out->make_wrong_resp('Нет доступа');
 
 //--------------------------------Валидация $in->ticketId
 if (((string) (int) $in->ticketId) !== ((string) $in->ticketId) || (int) $in->ticketId <= 0) $out->make_wrong_resp("Параметр 'ticketId' задан некорректно или отсутствует");
 $stmt = $pdo->prepare("SELECT `ticket_id`
     FROM `tickets_dz`
     WHERE `ticket_id` = :ticket_id
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса');
+;") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса');
 $stmt->execute([
     'ticket_id' => $in->ticketId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса');
@@ -86,7 +64,7 @@ if (((string) (int) $in->lastMessId) !== ((string) $in->lastMessId) || (int) $in
 $stmt = $pdo->prepare("SELECT `mess_id`
     FROM `tickets_mess_dz`
     WHERE `mess_id` = :last_mess_id
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
+;") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
 $stmt->execute([
     'last_mess_id' => $in->lastMessId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
@@ -94,11 +72,10 @@ if ($stmt->rowCount() == 0) $out->make_wrong_resp("Сообщение с ID {$in
 $stmt->closeCursor(); unset($stmt);
 
 //--------------------------------Получение заявки
-$stmt = $pdo->prepare("SELECT `tickets_dz`.`ticket_id`, `tickets_dz`.`lesson_number`, `tickets_dz`.`task_number`, `tickets_dz`.`type`, `tickets_dz`.`status`, 
-	`tickets_dz`.`quest_name`, `tickets_dz`.`user_vk_id`, `tickets_dz`.`importance`, `tickets_dz`.`when_made`, `tickets_dz`.`when_changed`
+$stmt = $pdo->prepare("SELECT `tickets_dz`.`user_vk_id`
     FROM `tickets_dz`
     WHERE `ticket_id` = :ticket_id
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
+;") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
 $stmt->execute([
     'ticket_id' => $in->ticketId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
@@ -107,47 +84,56 @@ $ticketDz = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
 $ticketDz = [
-	'ticketId' => (string) $ticketDz['ticket_id'],
-	'lessonNumber' => (string) $ticketDz['lesson_number'],
-	'taskNumber' => (string) $ticketDz['task_number'],
-	'type' => (string) $ticketDz['type'],
-	'status' => (string) $ticketDz['status'],
-	'questName' => (string) $ticketDz['quest_name'],
 	'userVkId' => (string) $ticketDz['user_vk_id'],
-	'importance' => (string) $ticketDz['importance'],
-	'whenMade' => (string) $ticketDz['when_made'],
-	'whenChanged' => (string) $ticketDz['when_changed'],
 ];
 
 //--------------------------------Получение сообщений заявки
 $stmt = $pdo->prepare("SELECT `tickets_mess_dz`.`mess_id`, `tickets_mess_dz`.`ticket_id`, `tickets_mess_dz`.`user_vk_id`, `tickets_mess_dz`.`comment`, 
 	`tickets_mess_dz`.`comment_dtime`, CONCAT(`users`.`user_name`,' ',`users`.`user_surname`) AS `mess_maker` FROM `tickets_mess_dz` 
 	LEFT JOIN `users` ON `users`.`user_vk_id`=`tickets_mess_dz`.`user_vk_id`
-	WHERE `tickets_mess_dz`.`ticket_id`=:ticket_id AND `tickets_mess_dz`.`mess_id`>:last_mess_id ORDER BY `comment_dtime` ASC;
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
+	WHERE `tickets_mess_dz`.`ticket_id`=:ticket_id AND `tickets_mess_dz`.`mess_id`>:last_mess_id ORDER BY `comment_dtime` ASC
+;") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
 $stmt->execute([
 	'ticket_id' => $in->ticketId,
 	'last_mess_id' => $in->lastMessId,
 	]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
+
 $lastMessId = '';
-$ticketsMessDz = [];
-while ($ticketsMessDz = $stmt->fetch(PDO::FETCH_ASSOC)){
-	$lastMessId = (string) $ticketsMessDz['mess_id'];
-	$ticketsMessDz[] = [
-		'messId' => (string) $ticketsMessDz['mess_id'],
-		'ticketId' => (string) $ticketsMessDz['ticket_id'],
-		'userVkId' => (string) $ticketsMessDz['user_vk_id'],
-		'comment' => (string) $ticketsMessDz['comment'],
-		'commentDtime' => (string) $ticketsMessDz['comment_dtime'],
-		'messMaker' => (string) $ticketsMessDz['mess_maker'],
-	];
+$newMessages= [];
+
+while($ticketsMessDz = $stmt->fetch(PDO::FETCH_ASSOC)){
+	
+	if($ticketsMessDz['user_vk_id']==$user_vk_id){
+		$who_made="<strong class='who_send_mess'>Я </strong>";
+		$style_mess="float:right; background:#f7e9f4;";
+	}
+	else{
+		if($ticketsMessDz['user_vk_id']==$ticketDz['user_vk_id']){
+			//$who_made="<strong class='who_send_mess'>создатель </strong>";
+			$who_made="<strong class='who_send_mess'>".$row_mess['mess_maker']." (созд.)</strong>";
+			$style_mess="float:left; background:#f0f3f8;";
+		}
+		else if($ticketsMessDz['user_vk_id']==dz_answerer){
+			//$who_made="<strong class='who_send_mess'>Ответственный</strong>";
+			$who_made="<strong class='who_send_mess'>".$row_mess['mess_maker']." (отв.)</strong>";
+			$style_mess="float:left; background:#f0f3f8; box-shadow:0 0 0 1px red;";
+		}
+		else{
+			$who_made="<a href='https://vk.com/id".$ticketsMessDz['user_vk_id']."' target='_blank'>".$ticketsMessDz['mess_maker']."</a>";
+			$style_mess="float:left; background:#e3fcf3;";
+		}
+	}
+	
+	$print_text=$who_made."<span style='color:#67809d; font-size:8px;'>(".$row_mess['comment_dtime'].")</span><br>".nl2br($row_mess['comment']);
+	$newMessages[] ="<div class='message' style='".$style_mess."'>".$print_text."</div>";
+	$lastMessId=$ticketsMessDz['mess_id'];
 }
 $stmt->closeCursor(); unset($stmt);
 
 //--------------------------------Вставка данных в ticket_dz_user
 $stmt = $pdo->prepare("INSERT IGNORE INTO `ticket_dz_user` (`ticket_id`,`user_vk_id`) 
-	VALUES (:ticket_id, :user_vk_id);
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
+	VALUES (:ticket_id, :user_vk_id)
+;") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
 $stmt->execute([
 	'ticket_id' => $in->ticketId,
 	'user_vk_id' => $user_vk_id,
@@ -163,8 +149,6 @@ $ticketDzUser = [
 
 //--------------------------------Формирование ответа
 $out->success = '1';
-$out->ticketDz = (object) $ticketDz;
-$out->ticketsMessDz = $ticketsMessDz;
-$out->ticketDzUser = (object) $ticketDzUser;
-$out->lastMessId = $lastMessId;
+$out->newMessages = $newMessages;
+$out->lastMessId = (string) $lastMessId;
 $out->make_resp('');
