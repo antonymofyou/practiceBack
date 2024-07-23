@@ -63,7 +63,7 @@ try {
 }
 
 //--------------------------------Проверка пользователя
-require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/check_user.inc.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
 if (!(in_array($user_type, ['Админ', 'Куратор']))) $out->make_wrong_resp('Нет доступа');
 
 //--------------------------------Валидация $in->ticketId

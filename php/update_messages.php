@@ -14,17 +14,18 @@ class UpdateMessagesAjax extends MainRequestClass {
 	
 }
 $in = new UpdateMessagesAjax();
-//$in->from_json(file_get_contents('php://input'));
-$in->from_json('{
-    "device": "",
-    "signature": "sdfgsdfg"
- }');
-$in->ticketId = '1';
-$in->lastMessId = '1';
-$user_vk_id = '1';
+$in->from_json(file_get_contents('php://input'));
+
 // класс ответа
 class UpdateMessagesAjaxResponse extends MainResponseClass {
-
+	/*
+	* 	Массив словарей, каждый словарь имеет следующие поля:
+	*     - messMaker - создатель сообщения
+	*     - comment - тело сообщения
+	*     - createdAt  - дата и время создания сообщения
+	*     - userRole - роль пользователя, создавшего сообщение 
+	*     - userVkId - идентификатор пользователя, создавшего сообщение
+	*/
 	public $newMessages = [];// новые сообщения по заявке
 
 	public $lastMessId = ''; // идентификатор последнего сообщения
@@ -44,8 +45,8 @@ try {
 }
 
 //--------------------------------Проверка пользователя
-//require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/check_user.inc.php';
-//if (!(in_array($user_type, ['Админ', 'Куратор']))) $out->make_wrong_resp('Нет доступа');
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
+if (!(in_array($user_type, ['Админ', 'Куратор']))) $out->make_wrong_resp('Нет доступа');
 
 //--------------------------------Валидация $in->ticketId
 if (((string) (int) $in->ticketId) !== ((string) $in->ticketId) || (int) $in->ticketId <= 0) $out->make_wrong_resp("Параметр 'ticketId' задан некорректно или отсутствует");
@@ -93,40 +94,38 @@ $stmt = $pdo->prepare("SELECT `tickets_mess_dz`.`mess_id`, `tickets_mess_dz`.`ti
 	LEFT JOIN `users` ON `users`.`user_vk_id`=`tickets_mess_dz`.`user_vk_id`
 	WHERE `tickets_mess_dz`.`ticket_id`=:ticket_id AND `tickets_mess_dz`.`mess_id`>:last_mess_id ORDER BY `comment_dtime` ASC
 ;") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
-$stmt->execute([
+$newMessagesQuery =$stmt->execute([
 	'ticket_id' => $in->ticketId,
 	'last_mess_id' => $in->lastMessId,
 	]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
-
+$newMessages = [];
+$userRole = '';
 $lastMessId = '';
-$newMessages= [];
 
-while($ticketsMessDz = $stmt->fetch(PDO::FETCH_ASSOC)){
-	
-	if($ticketsMessDz['user_vk_id']==$user_vk_id){
-		$who_made="<strong class='who_send_mess'>Я </strong>";
-		$style_mess="float:right; background:#f7e9f4;";
+while($newMessagesQuery = $stmt->fetch(PDO::FETCH_ASSOC)){
+	var_dump($newMessages);
+	if($newMessagesQuery['user_vk_id']==$user_vk_id){
+		$userRole="Вы";
+	}
+	else if($newMessagesQuery['user_vk_id']==$ticketDz['user_vk_id']){
+		$userRole="Создатель";
+	}
+	else if($newMessagesQuery['user_vk_id']==dz_answerer){
+		$userRole="Ответственный";
 	}
 	else{
-		if($ticketsMessDz['user_vk_id']==$ticketDz['user_vk_id']){
-			//$who_made="<strong class='who_send_mess'>создатель </strong>";
-			$who_made="<strong class='who_send_mess'>".$row_mess['mess_maker']." (созд.)</strong>";
-			$style_mess="float:left; background:#f0f3f8;";
-		}
-		else if($ticketsMessDz['user_vk_id']==dz_answerer){
-			//$who_made="<strong class='who_send_mess'>Ответственный</strong>";
-			$who_made="<strong class='who_send_mess'>".$row_mess['mess_maker']." (отв.)</strong>";
-			$style_mess="float:left; background:#f0f3f8; box-shadow:0 0 0 1px red;";
-		}
-		else{
-			$who_made="<a href='https://vk.com/id".$ticketsMessDz['user_vk_id']."' target='_blank'>".$ticketsMessDz['mess_maker']."</a>";
-			$style_mess="float:left; background:#e3fcf3;";
-		}
+		$userRole="Другая";
 	}
-	
-	$print_text=$who_made."<span style='color:#67809d; font-size:8px;'>(".$row_mess['comment_dtime'].")</span><br>".nl2br($row_mess['comment']);
-	$newMessages[] ="<div class='message' style='".$style_mess."'>".$print_text."</div>";
-	$lastMessId=$ticketsMessDz['mess_id'];
+
+	$newMessages[] =[
+		"messMaker" => (string) $newMessagesQuery["mess_maker"],
+		"comment" => (string) $newMessagesQuery["comment"],
+		"commentDtime" => (string) $newMessagesQuery["comment_dtime"],
+		"userRole" => (string) $userRole,
+		"userVkId" => (string) $newMessagesQuery["user_vk_id"],
+	];
+	$lastMessId = $newMessagesQuery['mess_id'];
+	var_dump($newMessages);
 }
 $stmt->closeCursor(); unset($stmt);
 
@@ -138,14 +137,7 @@ $stmt->execute([
 	'ticket_id' => $in->ticketId,
 	'user_vk_id' => $user_vk_id,
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
-$ticketDzUser = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
-
-$ticketDzUser = [
-	'ticketId' => (string) $ticketDzUser['ticket_id'],
-	'userVkId' => (string) $ticketDzUser['user_vk_id'],
-];
-
 
 //--------------------------------Формирование ответа
 $out->success = '1';
