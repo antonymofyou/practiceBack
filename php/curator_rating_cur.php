@@ -1,4 +1,4 @@
-<?php // Получение списка работ для дз
+<?php // Получение списка рейтингов
 
 header('Content-Type: application/json; charset=utf-8');
 
