@@ -1,4 +1,4 @@
-<?php // Get для страницы "Информация"
+<?php // Получение записей для страницы "Информация"
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -18,9 +18,9 @@ class GetInfoResponse extends MainResponseClass {
     id          int(10)      UNSIGNED NOT NULL PRIMARY KEY - Id "информации"
     header      varchar(100) UNIQUE DEFAULT NULL           - Заголовок
     body        mediumtext   DEFAULT NULL                  - Текст
-    whoChanged  bigint(20)   UNSIGNED NOT NULL             - Id пользователя внесшего правки
-    whenChanged datetime     DEFAULT NULL                  - Когда были внесены правки
-    public      tinyint(1)   DEFAULT 0 NOT NULL            - Опубликована ли запись? (0/1)
+    whoChanged  bigint(20)   UNSIGNED NOT NULL             - Id пользователя внесшего правки (Только в mode = "view")
+    whenChanged datetime     DEFAULT NULL                  - Когда были внесены правки       (Только в mode = "view")
+    public      tinyint(1)   DEFAULT 0 NOT NULL            - Опубликована ли запись? (0/1)   (Только в mode = "change")
     */
 }
 
