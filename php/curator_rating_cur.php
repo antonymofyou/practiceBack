@@ -97,7 +97,6 @@ else{
 }
 $stmt = $pdo->prepare($query) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
 $stmt->execute($params) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (1)');
-if($stmt->rowCount() == 0) $out->make_wrong_resp("Ни один рейтинг не был найден для пользователя/куратора [ID пользователя/куратора: {$curatorVkId}] ");
 
 $curatorsRating = [];
 while ($curatorRating = $stmt->fetch(PDO::FETCH_ASSOC)){
