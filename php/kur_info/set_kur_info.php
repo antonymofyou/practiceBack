@@ -203,3 +203,30 @@ if($in->action == "delete"){ // Удаляем "информацию" по id
     $out->success = "1";
     $out->make_resp('');
 }
+
+//Получение всех данных о задании из таблицы info
+$stmt = $pdo->prepare("
+    SELECT `id`, `header`, `body`, `who_changed`, `when_changed`, `public`, `page`
+    FROM `info` 
+    WHERE `id` = :infoId
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (10)');
+$stmt->execute([
+    'infoId' => $in->infoId
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (10)');
+if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
+$info = $stmt->fetch(PDO::FETCH_ASSOC);
+$stmt->closeCursor(); unset($stmt);
+
+//Формируем ответ словарём $info из всех полученных данных
+$out->info = [
+    'id' => (string) $info['id'],
+    'header' => (string) $info['header'],
+    'body' => (string) $info['body'],
+    'whoChanged' => (string) $info['who_changed'],
+    'whenChanged' => (string) $info['when_changed'],
+    'public' => (string) $info['public'],
+    'page' => (string) $info['page']
+];
+
+$out->success = "1";
+$out->make_resp('');
