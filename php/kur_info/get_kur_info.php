@@ -1,4 +1,4 @@
-<?php // Get для страницы "Информация"
+<?php // Получение информации для кураторов
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -6,49 +6,39 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 // Класс запроса
-class GetInfoRequest extends MainRequestClass {
-    public $infoId = '';  // Идентификатор "информации" (обяз.)
+class GetInfoByPageRequest extends MainRequestClass {
+    public $page   = '';  // Страница "1" - информация для кураторов, страница "2" - скрипты диалогов
     public $mode   = '';  // Режим получения данных (доступные значения: "view": для просмотра; "change": для изменения, доступ только админу)
-    public $page   = '';  // Страница "1" - общая информация, страница "2" - скрипты диалогов
 }
 
+$in = new GetInfoByPageRequest();
+$in->from_json(file_get_contents('php://input'));
+
 // Класс ответа
-class GetInfoResponse extends MainResponseClass {
-    public $info = []; /* Словарь данных "информации"
-    id          int(10)      UNSIGNED NOT NULL PRIMARY KEY - Id "информации"
-    header      varchar(100) UNIQUE DEFAULT NULL           - Заголовок
-    body        mediumtext   DEFAULT NULL                  - Текст
-    whoChanged  bigint(20)   UNSIGNED NOT NULL             - Id пользователя внесшего правки
-    whenChanged datetime     DEFAULT NULL                  - Когда были внесены правки
-    public      tinyint(1)   DEFAULT 0 NOT NULL            - Опубликована ли запись? (0|1)
+class GetInfoByPageResponse extends MainResponseClass {
+    public $infos = []; /* Массив словарей данных информации для кураторов, где каждый словарь имеет следующие поля:
+    - id          - Id информации для кураторов
+    - header      - Заголовок
+    - body        - Текст
+    - whoChanged  - Id пользователя внесшего правки
+    - whenChanged - Когда были внесены правки
+    - public      - Опубликована ли запись? (0/1)
     */
 }
 
-// Создание запроса
-$in = new GetInfoRequest();
-$in->from_json(file_get_contents('php://input'));
+$out = new GetInfoByPageResponse();
 
-// Создание ответа
-$out = new GetInfoResponse();
+// Валидация $in->page
+if (((string) (int) $in->page) !== ((string) $in->page) || (int) $in->page <= 0) $out->make_wrong_resp('Параметр {page} задан некорректно или отсутствует');
+
+// Валидация $in->mode
+if (!in_array($in->mode, ['view','change'])) $out->make_wrong_resp('Параметр {mode} задан некорректно или отсутствует');
 
 // Проверка пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
+if (!in_array($user_type, ['Куратор', 'Админ'])) $out->make_wrong_resp('Ошибка доступа');
 
-// Установка режима просмотра
-switch ($user_type) {
-    case 'Админ':
-        $in->mode = 'change';
-        break;
-    case 'Куратор':
-        $in->mode = 'view';
-        break;
-    default:
-        $out->make_wrong_resp('Ошибка доступа');
-        break;
-}
-
-// Валидация $in->infoId
-if (((string) (int) $in->infoId) !== ((string) $in->infoId) || (int) $in->infoId <= 0) $out->make_wrong_resp('Параметр "infoId" задан некорректно или отсутствует');
+if ($in->mode == 'change' && $user_type != 'Админ') $out->make_wrong_resp('Ошибка доступа. Режим редактирования доступен только администратору');
 
 // Подключение к БД
 try {
@@ -61,47 +51,52 @@ try {
     $out->make_wrong_resp('Нет соединения с базой данных');
 }
 
-// Получаем "информацию" по id
+// Получаем информацию для кураторов
 // Режим "view"
-if($in->mode == "view") {
-    $stmt = $pdo->prepare("SELECT `id`, `header`, `body`, `when_changed`, `who_changed` FROM `info` WHERE `id` = :infoId AND `page` = '$in->page' AND `public` = '1'") 
+if($in->mode == 'view') {
+    $stmt = $pdo->prepare("SELECT `id`, `header`, `body`, `when_changed`, `who_changed` FROM `info` WHERE `page` = :infoPage AND `public` = '1'")
     or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
-    
-    $stmt->execute(['id' => $in->infoId]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
-    
-    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Информация для куратора с ID {$in->infoId} не найдена");
-    
-    $info = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt->execute(['infoPage' => $in->page]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
+
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Информация для кураторов на странице {$in->page} не найдена");
+
+    $infos = [];
+    while ($info = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $infos[] = [
+            'id'          => (string) $info['id'],
+            'header'      => (string) $info['header'],
+            'body'        => (string) $info['body'],
+            'whenChanged' => (string) $info['when_changed'],
+            'whoChanged'  => (string) $info['who_changed'],
+        ];
+    }
+
     $stmt->closeCursor(); unset($stmt);
-    $info = [
-        'id'          => (string) $info['id'],
-        'header'      => (string) $info['header'],
-        'body'        => (string) $info['body'],
-        'whenChanged' => (string) $info['when_changed'],
-        'whoChanged'  => (string) $info['who_changed'],
-    ];
 }
 
 // Режим "change"
 if($in->mode == "change") {
-    $stmt = $pdo->prepare("SELECT `id`, `header`, `body`, `public` FROM `info` WHERE `id` = :infoId AND `page` = '$in->page'") 
+    $stmt = $pdo->prepare("SELECT `id`, `header`, `body`, `public` FROM `info` WHERE `page` = :infoPage") 
     or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
     
-    $stmt->execute(['id' => $in->infoId]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
-    
-    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Информация для куратора с ID {$in->infoId} не найдена");
-    
-    $info = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt->execute(['infoPage' => $in->page]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
+
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Информация для кураторов на странице {$in->page} не найдена");
+
+    $infos = [];
+    while ($info = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $infos[] = [
+            'id'     => (string) $info['id'],
+            'header' => (string) $info['header'],
+            'body'   => (string) $info['body'],
+            'public' => (string) $info['public'],
+        ];
+    }
+
     $stmt->closeCursor(); unset($stmt);
-    $info = [
-        'id'     => (string) $info['id'],
-        'header' => (string) $info['header'],
-        'body'   => (string) $info['body'],
-        'public' => (string) $info['public'],
-    ];
 }
 
 // Формируем ответ
 $out->success = '1';
-$out->info = (object) $info;
+$out->infos = (object) $infos;
 $out->make_resp('');
