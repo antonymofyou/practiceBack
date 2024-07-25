@@ -77,9 +77,9 @@ if($in->mode == 'view') {
 // Режим "change"
 if($in->mode == "change") {
     $stmt = $pdo->prepare("SELECT `id`, `header`, `body`, `public` FROM `info` WHERE `page` = :infoPage") 
-    or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
+    or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
     
-    $stmt->execute(['infoPage' => $in->page]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
+    $stmt->execute(['infoPage' => $in->page]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
 
     if ($stmt->rowCount() == 0) $out->make_wrong_resp("Информация для кураторов на странице {$in->page} не найдена");
 
