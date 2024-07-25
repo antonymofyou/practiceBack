@@ -59,20 +59,6 @@ try {
 
 // Создание строки информации для кураторов
 if($in->action == "create") {
-    // Валидация infoId, только если infoId задан
-    if($in->infoId != '') {
-        if (((string) (int) $in->infoId) !== ((string) $in->infoId) || (int) $in->infoId <= 0) $out->make_wrong_resp("Id информации для кураторов задан некорректно");
-            $stmt = $pdo->prepare("SELECT `id` FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
-            
-            $stmt->execute([
-                'infoId' => $in->infoId
-            ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
-            
-            if ($stmt->rowCount() != 0) $out->make_wrong_resp("Ошибка: Информации с Id {$in->infoId} уже существует");
-            
-            $stmt->closeCursor(); unset($stmt);
-    } else $in->infoId = null; // Иначе в запрос передаётся null, чтобы создать информацию для кураторов с новым номером
-
     // Создаём массивы с данными для запроса INSERT со всеми полями и словарь с данными для этих полей
     $columns = ['id', 'header', 'body', 'who_changed', 'when_changed', 'public', 'page'];
     $columns = join(', ', $columns);
@@ -81,7 +67,7 @@ if($in->action == "create") {
     $values = join(', ', $values);
 
     $params = [
-        'infoId' => $in->infoId,
+        'infoId' => null,
         'header' => null,
         'body' => null,
         'whoChanged' => $user_vk_id,
