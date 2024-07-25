@@ -46,10 +46,10 @@ $stmt = $pdo->prepare("
     SELECT `lesson_number`
     FROM `tickets_dz`
     WHERE `lesson_number` = :lesson_number
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса');
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
 $stmt->execute([
     'lesson_number' => $in->lessonNum
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса');
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
 if ($stmt->rowCount() == 0) $out->make_wrong_resp("Урок с номером {$in->lessonNum} не найден");
 $stmt->closeCursor(); unset($stmt);
 
@@ -59,10 +59,10 @@ $stmt = $pdo->prepare("
     SELECT `task_number`
     FROM `tickets_dz`
     WHERE `task_number` = :task_number
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
 $stmt->execute([
     'task_number' => $in->taskNum
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
 if ($stmt->rowCount() == 0) $out->make_wrong_resp("Задание с номером {$in->taskNum} не найдено");
 $stmt->closeCursor(); unset($stmt);
 
@@ -82,7 +82,7 @@ if (empty($in->text)) $out->make_wrong_resp("Параметр 'text' задан 
 $stmt = $pdo->prepare(
 	"INSERT INTO `tickets_dz` (`lesson_number`, `task_number`,`type`,`status`,`quest_name`,`importance`, `user_vk_id`, `when_made`, `when_changed`)
 	VALUES (:lesson_num, :task_num,:question_type, 'Открыт', :question_name, :question_importance, :user_vk_id, NOW(), NOW());"
-) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
+) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
 $stmt->execute([
 	"lesson_num" => $in->lessonNum,
 	"task_num" => $in->taskNum,
@@ -90,12 +90,12 @@ $stmt->execute([
 	"question_name" => $in->name,
 	"question_importance" => $in->importance,
 	"user_vk_id" => $user_vk_id,
-]) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (6)');
+]) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (3)');
 
 
 //--------------------------------Получение ticket_id созданного вопроса
-$stmt = $pdo->prepare("SELECT LAST_INSERT_ID() AS ticket_id;") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
-$stmt->execute([]) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (6)');
+$stmt = $pdo->prepare("SELECT LAST_INSERT_ID() AS ticket_id;") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
+$stmt->execute() or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (4)');
 $result = $stmt->fetch(PDO::FETCH_ASSOC);
 $ticketId = $result["ticket_id"];
 $stmt->closeCursor(); unset($stmt);
@@ -104,12 +104,12 @@ $stmt->closeCursor(); unset($stmt);
 $stmt = $pdo->prepare(
 	"INSERT INTO `tickets_mess_dz` (`ticket_id`, `user_vk_id`, `comment`, `comment_dtime`) 
 	VALUES(:ticket_id, :user_vk_id, :question_text, NOW());"
-) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
+) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (5)');
 $stmt->execute([
 	"ticket_id" => $ticketId,
 	"question_text" => $in->text,
 	"user_vk_id" => $user_vk_id,
-]) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (6)');
+]) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (5)');
 
 
 //--------------------------------Отправка создания важного вопроса

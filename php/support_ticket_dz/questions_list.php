@@ -65,10 +65,10 @@ $stmt = $pdo->prepare("
     SELECT `lesson_number`
     FROM `tickets_dz`
     WHERE `lesson_number` = :lesson_number
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса');
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
 $stmt->execute([
     'lesson_number' => $in->lessonNum
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса');
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
 if ($stmt->rowCount() == 0) $out->make_wrong_resp("Урок с номером {$in->lessonNum} не найден");
 $stmt->closeCursor(); unset($stmt);
 
@@ -78,10 +78,10 @@ $stmt = $pdo->prepare("
     SELECT `task_number`
     FROM `tickets_dz`
     WHERE `task_number` = :task_number
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса');
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
 $stmt->execute([
     'task_number' => $in->taskNum
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса');
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
 if ($stmt->rowCount() == 0) $out->make_wrong_resp("Задание с номером {$in->taskNum} не найдено");
 $stmt->closeCursor(); unset($stmt);
 
@@ -121,9 +121,9 @@ else{
 	];
 }
 
-$stmt = $pdo->prepare($query) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
+$stmt = $pdo->prepare($query) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
 
-$stmt->execute($params) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (1)');
+$stmt->execute($params) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (3)');
 $questionsList = [];
 while ($result = $stmt->fetch(PDO::FETCH_ASSOC)){
 	$questionsList[] = [
@@ -172,8 +172,8 @@ else{
 		'lesson_num' => $in->lessonNum,
 	];
 }
-$stmt = $pdo->prepare($query) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
-$stmt->execute($params) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (2)');
+$stmt = $pdo->prepare($query) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
+$stmt->execute($params) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (4)');
 
 $questionsListUnique = [];
 while ($result = $stmt->fetch(PDO::FETCH_ASSOC)){
