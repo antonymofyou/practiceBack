@@ -1,4 +1,4 @@
-<?php // Редактирование записей со страницы "Информация"
+<?php // Редактирование информации для кураторов
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -7,43 +7,41 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 // Класс запроса
 class SetInfoRequest extends MainRequestClass {
-    public $infoId = ''; // Идентификатор "информации" (обяз.)
+    public $infoId = ''; // Id информации для кураторов
 
-    public $infoUpdate = []; /* Словарь данных для обновления "информации"
-    header      varchar(100) DEFAULT NULL                  - Заголовок (Сочетание header и page должно быть уникальным)
-    body        mediumtext   DEFAULT NULL                  - Текст
-    whoChanged  bigint(20)   UNSIGNED NOT NULL             - Id пользователя внесшего правки
-    whenChanged datetime     DEFAULT NULL                  - Когда были внесены правки
-    public      tinyint(1)   DEFAULT 0 NOT NULL            - Опубликована ли запись? (0|1)
-    page        smallint(5)  UNSIGNED NOT NULL             - Страница (1|2)
+    public $infoUpdate = []; /* Словарь данных для обновления информации для кураторов, имеющий поля:
+    - header      - Заголовок (Сочетание header и page должно быть уникальным)
+    - body        - Текст
+    - whoChanged  - Id пользователя внесшего правки
+    - whenChanged - Когда были внесены правки
+    - public      - Опубликована ли запись? (0/1)
+    - page        - Страница (1/2)
     */
 
-    public $action = ''; // Действие с "информацией" (create - создание, update - изменение, delete - удаление)
+    public $action = ''; // Действие с информацией для кураторов (create - создание, update - изменение, delete - удаление)
 }
 
-// Класс ответа
-class SetInfoResponse extends MainResponseClass {
-    public $info = []; /* Словарь данных "информации"
-    id          int(10)      UNSIGNED NOT NULL PRIMARY KEY - Id "информации"
-    header      varchar(100) DEFAULT NULL                  - Заголовок (Сочетание header и page должно быть уникальным)
-    body        mediumtext   DEFAULT NULL                  - Текст
-    whoChanged  bigint(20)   UNSIGNED NOT NULL             - Id пользователя внесшего правки
-    whenChanged datetime     DEFAULT NULL                  - Когда были внесены правки
-    public      tinyint(1)   DEFAULT 0 NOT NULL            - Опубликована ли запись? (0|1)
-    page        smallint(5)  UNSIGNED NOT NULL             - Страница (1|2)
-    */
-}
-
-// Создание запроса
 $in = new SetInfoRequest();
 $in->from_json(file_get_contents('php://input'));
 
-// Создание ответа
+// Класс ответа
+class SetInfoResponse extends MainResponseClass {
+    public $info = []; /* Словарь данных информации для кураторов, имеющий поля:
+    - id          - Id информации для кураторов
+    - header      - Заголовок (Сочетание header и page должно быть уникальным)
+    - body        - Текст
+    - whoChanged  - Id пользователя внесшего правки
+    - whenChanged - Когда были внесены правки
+    - public      - Опубликована ли запись? (0/1)
+    - page        - Страница (1/2)
+    */
+}
+
 $out = new SetInfoResponse();
 
 // Проверка пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
-if (!in_array($user_type, ['Админ'])) $out->make_wrong_resp('Ошибка доступа');
+if ($user_type != 'Админ') $out->make_wrong_resp('Ошибка доступа');
 
 // Проверка поля action
 if($in->action != "create" && $in->action != "update" && $in->action != "delete") $out->make_wrong_resp('Неверное действие');
@@ -59,27 +57,27 @@ try {
     $out->make_wrong_resp('Нет соединения с базой данных');
 }
 
-// Создание строки "информации"
+// Создание строки информации для кураторов
 if($in->action == "create") {
     // Валидация infoId, только если infoId задан
     if($in->infoId != '') {
-        if (((string) (int) $in->infoId) !== ((string) $in->infoId) || (int) $in->infoId <= 0) $out->make_wrong_resp("Номер задания задан некорректно");
-            $stmt = $pdo->prepare("SELECT `id` FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
+        if (((string) (int) $in->infoId) !== ((string) $in->infoId) || (int) $in->infoId <= 0) $out->make_wrong_resp("Id информации для кураторов задан некорректно");
+            $stmt = $pdo->prepare("SELECT `id` FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
             
             $stmt->execute([
                 'infoId' => $in->infoId
-            ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
+            ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
             
-            if ($stmt->rowCount() != 0) $out->make_wrong_resp("Ошибка: Домашнее задание с номером {$in->infoId} уже существует");
+            if ($stmt->rowCount() != 0) $out->make_wrong_resp("Ошибка: Информации с Id {$in->infoId} уже существует");
             
             $stmt->closeCursor(); unset($stmt);
-    } else $in->infoId = null; //иначе в запрос передаётся null, чтобы создать задание с новым номером
+    } else $in->infoId = null; // Иначе в запрос передаётся null, чтобы создать информацию для кураторов с новым номером
 
-    //Создаём массивы с данными для запроса INSERT со всеми полями и словарь с данными для этих полей
+    // Создаём массивы с данными для запроса INSERT со всеми полями и словарь с данными для этих полей
     $columns = ['id', 'header', 'body', 'who_changed', 'when_changed', 'public', 'page'];
     $columns = join(', ', $columns);
 
-    $values = [':infoId', ':header', ':body', ':'.$user_vk_id, ':whenChanged', ':public', ':page'];
+    $values = [':infoId', ':header', ':body', ':whoChanged', ':whenChanged', ':public', ':page'];
     $values = join(', ', $values);
 
     $params = [
@@ -92,29 +90,29 @@ if($in->action == "create") {
         'page' => null
     ];
 
-    $stmt = $pdo->prepare("INSERT INTO `info` ($columns) VALUES ($values)") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (5)');
-    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (5)');
+    $stmt = $pdo->prepare("INSERT INTO `info` ($columns) VALUES ($values)") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
+    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
     $stmt->closeCursor(); unset($stmt);
 
-    $in->infoId = $pdo->lastInsertId(); if(!$in->infoId) $out->make_wrong_resp('Произошла ошибка при создании "информации"');
+    $in->infoId = $pdo->lastInsertId(); if(!$in->infoId) $out->make_wrong_resp('Произошла ошибка при создании информации для кураторов');
 }
 
-// Обновление строки "информации"
+// Обновление строки информации для кураторов
 if ($in->action == "update") {
     //Валидация $in->infoId
-    if (((string) (int) $in->infoId) !== ((string) $in->infoId) || (int) $in->infoId <= 0) $out->make_wrong_resp("Номер задания задан некорректно или отсутствует");
+    if (((string) (int) $in->infoId) !== ((string) $in->infoId) || (int) $in->infoId <= 0) $out->make_wrong_resp("Id информации для кураторов задан некорректно");
     
-    $stmt = $pdo->prepare("SELECT `id` FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (8)');
+    $stmt = $pdo->prepare("SELECT `id` FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
     
     $stmt->execute([
         'infoId' => $in->infoId
-    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (8)');
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
     
-    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Домашнее задание с номером {$in->infoId} не найдено");
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Информация с Id {$in->infoId} не найдена");
     
     $stmt->closeCursor(); unset($stmt);
 
-    $changes = []; //Словарь с валидированными изменениями
+    $changes = []; // Словарь с валидированными изменениями
 
     // Валидация $in->infoUpdate[], если поле указано, то валидируем и добавляем в список изменений
     // Валидация header
@@ -137,22 +135,22 @@ if ($in->action == "update") {
 
     // Валидация whenChanged
     if (isset($in->infoUpdate['whenChanged'])) {
-        if (!is_string($in->infoUpdate['whenChanged'])) $out->make_wrong_resp("Поле 'whenChanged' задано некорректно (1)");
+        if (!is_string($in->infoUpdate['whenChanged'])) $out->make_wrong_resp("Поле 'whenChanged' задано некорректно");
         $changes['when_changed'] = $in->infoUpdate['whenChanged'];
     }
 
     // Валидация public
     if (isset($in->infoUpdate['public'])) {
-        if (((string) (int) $in->infoUpdate['public']) !== ((string) $in->infoUpdate['public'])) $out->make_wrong_resp("Поле 'public' задано некорректно (1)");
-        if (!in_array($in->infoUpdate['public'], [0, 1])) $out->make_wrong_resp("Поле 'public' задано некорректно (2)");
+        if (((string) (int) $in->infoUpdate['public']) !== ((string) $in->infoUpdate['public'])) $out->make_wrong_resp("Поле 'public' задано некорректно");
+        if (!in_array($in->infoUpdate['public'], [0, 1])) $out->make_wrong_resp("Поле 'public' задано некорректно");
 
         $changes['public'] = $in->infoUpdate['public'];
     }
 
     // Валидация page
     if (isset($in->infoUpdate['page'])) {
-        if (((string) (int) $in->infoUpdate['page']) !== ((string) $in->infoUpdate['page'])) $out->make_wrong_resp("Поле 'page' задано некорректно (1)");
-        if (0 < $in->infoUpdate['page'] <= 5) $out->make_wrong_resp("Поле 'page' задано некорректно (2)");
+        if (((string) (int) $in->infoUpdate['page']) !== ((string) $in->infoUpdate['page'])) $out->make_wrong_resp("Поле 'page' задано некорректно");
+        if (0 < $in->infoUpdate['page'] <= 5) $out->make_wrong_resp("Поле 'page' задано некорректно");
         $changes['page'] = $in->infoUpdate['page'];
     }
 
@@ -171,62 +169,35 @@ if ($in->action == "update") {
     $values = join(', ', $values);
     $params['infoId'] = $in->infoId;
 
-    $stmt = $pdo->prepare("UPDATE `info` SET $values WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (9)');
-    $stmt->execute($params) or $out->make_wrong_resp("Ошибка базы данных: выполнение запроса (9)");
+    $stmt = $pdo->prepare("UPDATE `info` SET $values WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
+    $stmt->execute($params) or $out->make_wrong_resp("Ошибка базы данных: выполнение запроса (4)");
     $stmt->closeCursor(); unset($stmt);  
 }
 
-// Удаление строки "информации"
-if($in->action == "delete"){ // Удаляем "информацию" по id
+// Удаление строки информации для кураторов
+if($in->action == "delete"){
     // Валидация $in->infoId
-    if (((string) (int) $in->infoId) !== ((string) $in->infoId) || (int) $in->infoId <= 0) $out->make_wrong_resp('Параметр "infoId" задан некорректно или отсутствует');
+    if (((string) (int) $in->infoId) !== ((string) $in->infoId) || (int) $in->infoId <= 0) $out->make_wrong_resp('Id информации для кураторов задан некорректно');
     
-    $stmt = $pdo->prepare("SELECT `id` FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
+    $stmt = $pdo->prepare("SELECT `id` FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (5)');
     
     $stmt->execute([
         'infoId' => $in->infoId
-    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (5)');
     
-    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: информация для куратора {$in->infoId} не найдена");
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: информация с Id {$in->infoId} не найдена");
         $stmt->closeCursor(); unset($stmt);
 
-    // Удаляем "информацию" по id
-    $stmt = $pdo->prepare("DELETE FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
+    // Удаляем информацию по id
+    $stmt = $pdo->prepare("DELETE FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
     
     $stmt->execute([
         'infoId' => $in->infoId
-    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
     
     $stmt->closeCursor(); unset($stmt);
 
-    $out->message = "Информация для куратора $in->infoId удалена";
+    $out->message = "Информация для куратора с Id {$in->infoId} удалена";
     $out->success = "1";
     $out->make_resp('');
 }
-
-//Получение всех данных о задании из таблицы info
-$stmt = $pdo->prepare("
-    SELECT `id`, `header`, `body`, `who_changed`, `when_changed`, `public`, `page`
-    FROM `info` 
-    WHERE `id` = :infoId
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (10)');
-$stmt->execute([
-    'infoId' => $in->infoId
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (10)');
-if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
-$info = $stmt->fetch(PDO::FETCH_ASSOC);
-$stmt->closeCursor(); unset($stmt);
-
-//Формируем ответ словарём $info из всех полученных данных
-$out->info = [
-    'id' => (string) $info['id'],
-    'header' => (string) $info['header'],
-    'body' => (string) $info['body'],
-    'whoChanged' => (string) $info['who_changed'],
-    'whenChanged' => (string) $info['when_changed'],
-    'public' => (string) $info['public'],
-    'page' => (string) $info['page']
-];
-
-$out->success = "1";
-$out->make_resp('');
