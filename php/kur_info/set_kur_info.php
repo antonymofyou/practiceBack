@@ -76,8 +76,8 @@ if($in->action == "create") {
         'page' => null
     ];
 
-    $stmt = $pdo->prepare("INSERT INTO `info` ($columns) VALUES ($values)") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
-    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
+    $stmt = $pdo->prepare("INSERT INTO `info` ($columns) VALUES ($values)") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
+    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
     $stmt->closeCursor(); unset($stmt);
 
     $in->infoId = $pdo->lastInsertId(); if(!$in->infoId) $out->make_wrong_resp('Произошла ошибка при создании информации для кураторов');
@@ -88,11 +88,11 @@ if ($in->action == "update") {
     //Валидация $in->infoId
     if (((string) (int) $in->infoId) !== ((string) $in->infoId) || (int) $in->infoId <= 0) $out->make_wrong_resp("Id информации для кураторов задан некорректно");
     
-    $stmt = $pdo->prepare("SELECT `id` FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
+    $stmt = $pdo->prepare("SELECT `id` FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
     
     $stmt->execute([
         'infoId' => $in->infoId
-    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
     
     if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Информация с Id {$in->infoId} не найдена");
     
@@ -155,8 +155,8 @@ if ($in->action == "update") {
     $values = join(', ', $values);
     $params['infoId'] = $in->infoId;
 
-    $stmt = $pdo->prepare("UPDATE `info` SET $values WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
-    $stmt->execute($params) or $out->make_wrong_resp("Ошибка базы данных: выполнение запроса (4)");
+    $stmt = $pdo->prepare("UPDATE `info` SET $values WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
+    $stmt->execute($params) or $out->make_wrong_resp("Ошибка базы данных: выполнение запроса (3)");
     $stmt->closeCursor(); unset($stmt);  
 }
 
@@ -165,21 +165,21 @@ if($in->action == "delete"){
     // Валидация $in->infoId
     if (((string) (int) $in->infoId) !== ((string) $in->infoId) || (int) $in->infoId <= 0) $out->make_wrong_resp('Id информации для кураторов задан некорректно');
     
-    $stmt = $pdo->prepare("SELECT `id` FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (5)');
+    $stmt = $pdo->prepare("SELECT `id` FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
     
     $stmt->execute([
         'infoId' => $in->infoId
-    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (5)');
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
     
     if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: информация с Id {$in->infoId} не найдена");
         $stmt->closeCursor(); unset($stmt);
 
     // Удаляем информацию по id
-    $stmt = $pdo->prepare("DELETE FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
+    $stmt = $pdo->prepare("DELETE FROM `info` WHERE `id` = :infoId") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (5)');
     
     $stmt->execute([
         'infoId' => $in->infoId
-    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (5)');
     
     $stmt->closeCursor(); unset($stmt);
 
