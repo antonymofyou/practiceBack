@@ -45,6 +45,7 @@ class SetStaffResponse extends MainResponseClass {
 
     */
 
+    public $fields = []; // Поля с личными данными
 }
 $out = new SetStaffResponse();
 
@@ -286,6 +287,28 @@ $out->info = [
     'middleName' => (string) $info['middle_name'],
     'blocked' => (string) $info['blocked']
 ];
+
+//Получаем поля с личными данными по id
+$stmt = $pdo->prepare("
+    SELECT `user_id`, `field`, `value`, `comment`
+    FROM `staff_pers_data`
+    WHERE `user_id` = :id
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (8)');
+$stmt->execute([
+    'id' => $in->id
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (8)');
+//Формируем ответ с личными данными сотрудника
+$fields = [];
+while ($field = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    $fields[] = [
+        'id' => (string) $field['user_id'],
+        'field' => (string) $field['field'],
+        'value' => (string) $field['value'],
+        'comment' => (string) $field['comment'],
+    ];
+}
+$out->fields = $fields;
+$stmt->closeCursor(); unset($stmt);
 
 $out->success = "1";
 $out->make_resp('');
