@@ -152,7 +152,7 @@ if($in->action == "create") { //Тут делаем создание
 
     //Создаём массивы с данными для запроса INSERT со всеми полями и словарь с данными для этих полей
     $columns = ['ht_number', 'ht_nums_p1', 'ht_nums_p1_dop', 'ht_nums_p2', 'type_p1', 'add_other_tasks_p1', 'add_other_tasks_p2', 'ht_status', 'ht_deadline', 'ht_deadline_time', 'ht_deadline_cur', 'ht_comment', 'is_probnik', 'timer_seconds_p1', 'timer_seconds_p2'];
-    $columns = join(', ', $columns);
+    $columns = "`" . join('`, `', $columns) . "`";
 
     $values = [':htNumber', ':htNumsP1', ':htNumsP1Dop', ':htNumsP2', ':typeP1', ':addOtherTasksP1', ':addOtherTasksP2', ':htStatus', ':htDeadline', ':htDeadlineTime', ':htDeadlineCur', ':htComment', ':isProbnik', ':timerSecondsP1', ':timerSecondsP2'];
     $values = join(', ', $values);
@@ -246,8 +246,7 @@ if($in->action == "update"){ //Тут начинается действие Upda
 
     //typeP1
     if (isset($in->htUpdate['typeP1'])) {
-        if (mb_strlen($htUpdate['typeP1']) > 50) $out->make_wrong_resp("Поле 'typeP1' задано некорректно (1)");
-        if (!in_array($in->htUpdate['typeP1'], ["Как в ЕГЭ", "Вопросы из урока"])) $out->make_wrong_resp("Поле 'typeP1' задано некорректно (2)");
+        if (!in_array($in->htUpdate['typeP1'], ["Как в ЕГЭ", "Вопросы из урока"])) $out->make_wrong_resp("Поле 'typeP1' задано некорректно");
         $changes['type_p1'] = $in->htUpdate['typeP1'];
     }
 
@@ -268,8 +267,7 @@ if($in->action == "update"){ //Тут начинается действие Upda
 
     //htStatus
     if (isset($in->htUpdate['htStatus'])) {
-        if (mb_strlen($htUpdate['htStatus']) > 50) $out->make_wrong_resp("Поле 'htStatus' задано некорректно (1)");
-        if (!in_array($in->htUpdate['htStatus'], ["Новое", "Выполнение", "Проверка", "Завершено"])) $out->make_wrong_resp("Поле 'htStatus' задано некорректно (2)");
+        if (!in_array($in->htUpdate['htStatus'], ["Новое", "Выполнение", "Проверка", "Завершено"])) $out->make_wrong_resp("Поле 'htStatus' задано некорректно");
         $changes['ht_status'] = $in->htUpdate['htStatus'];
     }
 
@@ -293,7 +291,7 @@ if($in->action == "update"){ //Тут начинается действие Upda
 
     //htComment
     if (isset($in->htUpdate['htComment'])) {
-        if (!is_string($in->htUpdate['htComment']) || (mb_strlen($htUpdate['htComment'] > 256))) $out->make_wrong_resp("Поле 'htComment' задано некорректно");
+        if (!is_string($in->htUpdate['htComment'])) $out->make_wrong_resp("Поле 'htComment' задано некорректно");
         $changes['ht_comment'] = $in->htUpdate['htComment'];
     }
 
