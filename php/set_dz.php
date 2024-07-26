@@ -53,7 +53,7 @@ class SetHometaskResponse extends MainResponseClass {
     htNumsP1 INT - Количество вопросов из первой части
     htNumsP1Dop INT - Количество дополнительных вопросов из первой части
     htNumsP2 INT - Количество вопросов из второй части
-    typeP1 TEXT - Тип вопросов: Вопросыизурона или КаквЕГЭ
+    typeP1 TEXT - Тип вопросов: Вопросы из урока или Как в ЕГЭ
     addOtherTasksP1 BOOLEAN - Добавить задания Ч1 из других уроков в случае нехватки
     addOtherTasksP2 BOOLEAN - Добавить задания Ч2 из других уроков в случае нехватки
     htStatus TEXT - Статус задания: Новое, Выполнение, Проверка или Завершено
@@ -368,10 +368,10 @@ $stmt = $pdo->prepare("
     WHERE `q_lesson_num` = :htNumber 
     AND `q_public` = 1 
     AND `selfmade` = 1
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса(13)');
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса(12)');
 $stmt->execute([
     'htNumber' => $in->htNumber
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса(13)');
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса(12)');
 if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
 $numsP1Dop = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
@@ -382,10 +382,10 @@ $stmt = $pdo->prepare("
     FROM `questions2`
     WHERE `q2_lesson_num` = :htNumber 
     AND `q2_public` = 1 
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса(12)');
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса(13)');
 $stmt->execute([
     'htNumber' => $in->htNumber
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса(12)');
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса(13)');
 if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
 $numsP2 = $stmt->fetch(PDO::FETCH_ASSOC); //Добавляем полученные данные в $questions
 $stmt->closeCursor(); unset($stmt);
