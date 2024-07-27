@@ -18,7 +18,8 @@ $in->from_json(file_get_contents('php://input'));
 // Класс ответа
 class GetInfoByPageResponse extends MainResponseClass
 {
-    public $infos = []; /* Массив словарей данных информации для кураторов, где каждый словарь имеет следующие поля:
+    /*
+    Массив словарей данных информации для кураторов, где каждый словарь имеет следующие поля:
     - id          - Id информации для кураторов
     - header      - Заголовок
     - body        - Текст
@@ -26,6 +27,7 @@ class GetInfoByPageResponse extends MainResponseClass
     - whenChanged - Когда были внесены правки
     - public      - Опубликована ли запись? (0/1) (Только в $mode="change")
     */
+    public $infos = [];
 }
 
 $out = new GetInfoByPageResponse();
