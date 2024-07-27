@@ -24,7 +24,7 @@ class GetInfoByPageResponse extends MainResponseClass
     - body        - Текст
     - whoChanged  - Id пользователя внесшего правки
     - whenChanged - Когда были внесены правки
-    - public      - Опубликована ли запись? (0/1)
+    - public      - Опубликована ли запись? (0/1) (Только в $mode="change")
     */
 }
 
