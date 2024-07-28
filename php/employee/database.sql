@@ -10,7 +10,7 @@ CREATE TABLE `staff` (
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE `staff_pers_data` (
-    `user_id` INT NOT NULL,
+    `staff_id` INT NOT NULL,
     `field`  VARCHAR(255) NOT NULL,
     `value` TEXT NULL,
     `comment` TEXT NULL,

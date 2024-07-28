@@ -6,23 +6,30 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 class GetStaff extends MainRequestClass {
-    public $id = ''; //Ключ сотрудника
+    public $staffId = ''; //Идентификатор сотрудника
 }
-
 $in = new GetStaff();
 $in->from_json(file_get_contents('php://input'));
 
 class GetStaffResponse extends MainResponseClass {
-    public $info = []; /* Словарь с данными сотрудника
-    id
-    vkId
-    type
-    firstName
-    lastName
-    middleName
-    blocked
+    /* Словарь с данными сотрудника
+        - staffId - Идентификатор сотрудника
+        - vkId - Идентификатор профиля ВК сотрудника
+        - type - Тип сотрудника: Админ или Куратор ?
+        - firstName - Имя сотрудника
+        - lastName - Фамилия сотрудника
+        - middleName - Отчество сотрудника
+        - blocked - Заблокирован ли сотрудник или нет, значение 0 или 1 соотвественно
     */
-    public $fields = []; // Поля с личными данными
+    public $info = []; // Словарь с возвращаемыми данными сотрудника
+
+    /* Массив словарей со следующими полями:
+        - staff_id - Идентификатор соответствующего сотрудника
+        - field - Наименование личных данных 
+        - value - Значение личных данных, необязательно
+        - comment - Комментарий к полю, необязательно
+    */
+    public $fields = []; // Массив словарей с личными данными
 }
 $out = new GetStaffResponse();
 
@@ -42,27 +49,27 @@ try {
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
 if (!in_array($user_type, ['Админ', 'Куратор'])) $out->make_wrong_resp('Ошибка доступа');
 
-//Валидация id
-if (((string) (int) $in->id) !== ((string) $in->id) || (int) $in->id <= 0) $out->make_wrong_resp("Номер сотрудника задан некорректно или отсутствует");
+//Валидация staffId
+if (((string) (int) $in->staffId) !== ((string) $in->staffId) || (int) $in->staffId <= 0) $out->make_wrong_resp("Параметр 'staffId' задан некорректно или отсутствует");
 $stmt = $pdo->prepare("
     SELECT `id`
     FROM `staff`
-    WHERE `id` = :id
+    WHERE `id` = :staffId;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
 $stmt->execute([
-    'id' => $in->id
+    'staffId' => $in->staffId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
-if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Сотрудник с номером {$in->id} не найден");
+if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Сотрудник с ID {$in->staffId} не найден");
 $stmt->closeCursor(); unset($stmt);
 
-//Получаем данные по id
+//Получаем данные по staffId
 $stmt = $pdo->prepare("
     SELECT `id`, `vk_id`, `type`, `first_name`, `last_name`, `middle_name`, `blocked`
     FROM `staff`
-    WHERE `id` = :id
+    WHERE `id` = :staffId;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (7)');
 $stmt->execute([
-    'id' => $in->id
+    'staffId' => $in->staffId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (7)');
 if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
 $info = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -70,7 +77,7 @@ $stmt->closeCursor(); unset($stmt);
 
 //Из полученных данных формируем словарь в вывод
 $out->info = [
-    'id' => (string) $info['id'],
+    'staffId' => (string) $info['staffId'],
     'vkId' => (string) $info['vk_id'],
     'type' => (string) $info['type'],
     'firstName' => (string) $info['first_name'],
@@ -79,20 +86,20 @@ $out->info = [
     'blocked' => (string) $info['blocked']
 ];
 
-//Получаем поля с личными данными по id
+//Получаем поля с личными данными по staffId
 $stmt = $pdo->prepare("
-    SELECT `user_id`, `field`, `value`, `comment`
+    SELECT `staff_id`, `field`, `value`, `comment`
     FROM `staff_pers_data`
-    WHERE `user_id` = :id
+    WHERE `staff_id` = :staffId;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (8)');
 $stmt->execute([
-    'id' => $in->id
+    'staffId' => $in->staffId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (8)');
 //Формируем ответ с личными данными сотрудника
 $fields = [];
 while ($field = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $fields[] = [
-        'id' => (string) $field['user_id'],
+        'staffId' => (string) $field['staff_id'],
         'field' => (string) $field['field'],
         'value' => (string) $field['value'],
         'comment' => (string) $field['comment'],
