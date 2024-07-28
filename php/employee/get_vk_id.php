@@ -6,14 +6,14 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 class GetStaff extends MainRequestClass {
-    public $url = ''; //Получаем ссылку на профиль ВК
+    public $url = ''; //Ссылка на профиль ВК
 }
 
 $in = new GetStaff();
 $in->from_json(file_get_contents('php://input'));
 
 class GetStaffResponse extends MainResponseClass {
-    public $vkId = ''; //Отдаём ВК id
+    public $vkId = ''; //Идентификатор профиля ВК
 }
 $out = new GetStaffResponse();
 
@@ -40,6 +40,16 @@ curl_setopt($curl, CURLOPT_URL, 'https://api.vk.com/method/users.get?user_id=' .
 curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
 $response = (array) json_decode(curl_exec($curl)); //Проводим запрос и получем словарь с одним массивом с одним словарём
 curl_close($curl);
+
+//Если ВК ответил ошибкой, то выводим ошибку
+if(array_key_exists('error', $response)) {
+    $error = (array) $response['error'];
+    $errorCode = $error['error_code'];
+    $errorMessage = $error['error_msg'];
+    $out->make_wrong_resp("Произошла ошибка VK, код ошибки: [$errorCode]: {$errorMessage}");
+}
+//Если получен пустой ответ, то выводим ошибку
+if(empty($response['response'])) $out->make_wrong_resp('Пользователь ВК не найден');
 
 //Добираемся до ВК ID
 $response = (array) $response['response'];

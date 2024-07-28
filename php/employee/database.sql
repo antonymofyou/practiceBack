@@ -14,6 +14,6 @@ CREATE TABLE `staff_pers_data` (
     `field`  VARCHAR(255) NOT NULL,
     `value` TEXT NULL,
     `comment` TEXT NULL,
-    PRIMARY KEY (`user_id`, `field`),
-    INDEX (`user_id`)
+    PRIMARY KEY (`staff_id`, `field`),
+    INDEX (`staff_id`)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
