@@ -1,4 +1,4 @@
-<?php // Получаем данные пользователя
+<?php // Получаем данные пользователя для редактирования
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -15,9 +15,9 @@ $in->from_json(file_get_contents('php://input'));
 // Класс ответа
 class UsersChangeUserResponse  extends MainResponseClass {
 
-    /* Словарь со следующими полями:
+    /*  Словарь со следующими полями:
      *  - userVkId - ВК ID пользователя
-     *  - userPromo - Промокод пользователя
+     *  - userPromo - Реферальный промокод пользователя
      *  - userReferer - ID реферера, который пригласил этого пользователя
      *  - userAvaLink - Ссылка на ВК аватар пользователя
      *  - userName - Имя пользователя
@@ -63,7 +63,7 @@ if (!in_array($user_type, ['Админ'])) $out->make_wrong_resp('Ошибка �
 if (((string) (int) $in->userVkId) !== ((string) $in->userVkId) || (int) $in->userVkId <= 0) $out->make_wrong_resp("Параметр 'userVkId' задан неверно или отсутствует");
     $stmt = $pdo->prepare("
         SELECT `user_vk_id`
-        FROM `home_tasks`
+        FROM `users`
         WHERE `user_vk_id` = :userVkId;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
     $stmt->execute([
@@ -76,7 +76,7 @@ if (((string) (int) $in->userVkId) !== ((string) $in->userVkId) || (int) $in->us
 //0-B 1-C 2-D 3-E 4-F 5-G 6-H 7-K 8-L 9-M
 $letters = array('B', 'C', 'D', 'E', 'F', 'G', 'H', 'K', 'L', 'M');
 $numbers = array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9');
-$promocode = str_replace($numbers, $letters,  $ref_id);
+$promocode = str_replace($numbers, $letters, $in->userVkId);
 
 //Получаем данные
 $stmt = $pdo->prepare("
