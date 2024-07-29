@@ -14,7 +14,9 @@ class SupportMakeSupportTicket extends MainRequestClass
     /* Словарь заявки, который имеет следующие поля:
      * type          - Тип заявки
      * name          - Название заявки
-     * importance    - Важность заявки
+     * importance    - Важность заявки:
+     *                 5 - Обычная,
+     *                 10 - Сверхсрочная
      */
     public $ticket = [];
     public $ticket_text = ''; // Текст заявки
@@ -32,7 +34,7 @@ class SupportMakeSupportTicketResp extends MainResponseClass
 $out = new SupportMakeSupportTicketResp();
 
 // Проверка пользователя
-if (!in_array($user_type, ['Куратор', 'Админ'])) $out->make_wrong_resp("Ошибка доступа");
+in_array($user_type, ['Куратор', 'Админ']) or $out->make_wrong_resp("Ошибка доступа");
 
 // Валидация поля importance (5 - обычная, 10 - сверхсрочная)
 in_array($in->ticket['importance'], ['5', '10']) or $out->make_wrong_resp("Поле importance задано некорректно {$in->ticket['importance']}");
@@ -70,7 +72,7 @@ try {
 
 // Создание подключения к БД для ВК бота
 $mysqli = mysqli_init();
-$mysqli->real_connect($host, $user, $password, $database,NULL,NULL, $ssl_flag) or $out->make_wrong_resp("can\'t connect DB");
+$mysqli->real_connect($host, $user, $password, $database, NULL, NULL, $ssl_flag) or $out->make_wrong_resp("can\'t connect DB");
 
 /* Статусы заявок:
  * 0 - Новая,
@@ -92,7 +94,7 @@ $stmt->execute([
     'importance' => $in->ticket['importance'],
     'userVkId' => $user_vk_id,
     'responderVkId' => $responder_vk_id,
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');;
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
 
 // Получение ID созданной заявки
 $out->id = $pdo->lastInsertId();
@@ -109,7 +111,7 @@ $stmt->execute([
     'id' => $out->id,
     'userVkId' => $user_vk_id,
     'comment' => $in->ticket_text,
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');;
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
 
 // Отправка заявок через ВК бота
 $message = $in->ticket['importance'] > 5 ? 'Тебе назначена СРОЧНАЯ заявка №' . $out->id : 'Тебе назначена заявка №' . $out->id;
