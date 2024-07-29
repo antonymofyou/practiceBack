@@ -5,7 +5,7 @@ header('Content-Type: application/json; charset=utf-8');
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
-class SetStaff extends MainRequestClass {
+class EmployeeSetStaff extends MainRequestClass {
     public $staffId = ''; // Идентификатор сотрудника
 
     public $action = ''; // Кодовое слово для одного из действий: create - добавление данных сотрудника, update - обновление данных сотрудника или delete - удаление данных сотрудника
@@ -21,10 +21,10 @@ class SetStaff extends MainRequestClass {
     public $set = []; //Словарь с данными сотрудника для создания или обновления
 
 }
-$in = new SetStaff();
+$in = new EmployeeSetStaff();
 $in->from_json(file_get_contents('php://input'));
 
-class SetStaffResponse extends MainResponseClass {
+class EmployeeSetStaffResponse extends MainResponseClass {
 
     /* Словарь с данными сотрудника
         - id - Идентификатор сотрудника
@@ -45,7 +45,7 @@ class SetStaffResponse extends MainResponseClass {
     */
     public $fields = []; // Поля с личными данными
 }
-$out = new SetStaffResponse();
+$out = new EmployeeSetStaffResponse();
 
 //Подключение к БД
 try {

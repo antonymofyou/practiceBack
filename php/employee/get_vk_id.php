@@ -5,17 +5,17 @@ header('Content-Type: application/json; charset=utf-8');
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
-class GetStaff extends MainRequestClass {
+class EmployeeGetVkId extends MainRequestClass {
     public $url = ''; //Ссылка на профиль ВК
 }
 
-$in = new GetStaff();
+$in = new EmployeeGetVkId();
 $in->from_json(file_get_contents('php://input'));
 
-class GetStaffResponse extends MainResponseClass {
+class EmployeeGetVkIdResponse extends MainResponseClass {
     public $vkId = ''; //Идентификатор профиля ВК
 }
-$out = new GetStaffResponse();
+$out = new EmployeeGetVkIdResponse();
 
 //Подключение к БД
 try {
