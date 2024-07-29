@@ -1,5 +1,6 @@
-<?php // Получение информации для кураторов
+<?php // Получение заявок в тех. поддержку
 
+global $user_type, $user_vk_id;
 header('Content-Type: application/json; charset=utf-8');
 
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
