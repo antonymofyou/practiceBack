@@ -154,6 +154,10 @@ if ($user_type == 'Куратор') {
     $out->completedTickets = $completedTickets;
 }
 
+// Ответ
+$out->success = '1';
+$out->make_resp('');
+
 /**
  * Функция заполняет массив элементами полученными в запросе
  *
@@ -167,7 +171,25 @@ if ($user_type == 'Куратор') {
  * - user_vk_id,
  * - response_vk_id
  * @param int $user_vk_id - ВК ID пользователя ($user_vk_id из check_user.inc.php)
- * @return array
+ * @return array - Массив словарей заявок, где каждый словарь имеет следующие поля:
+ * - id            - ID заявки
+ * - name          - Название заявки
+ * - type          - Типы заявок:
+ *                   1 - Организационные вопросы,
+ *                   2 - Финансы, договора,
+ *                   5 - Антон,
+ *                   6 - Лиза Тюрина
+ *                   7 - Редактирование ученика,
+ *                   10 - Светлана Леонидовна
+ * - status        - Статусы заявок:
+ *                   0 - Новая,
+ *                   1 - В работе,
+ *                   5 - Завершена,
+ *                   10 - Архив
+ * - deadline      - Дата дедлайна заявки
+ * - needAnswer    - Нужен ли ответ на заявку (влияет на отображение):
+ *                   0 - Нет,
+ *                   1 - Да
  */
 function fillTickets(PDOStatement $stmt, int $user_vk_id): array
 {
@@ -192,7 +214,3 @@ function fillTickets(PDOStatement $stmt, int $user_vk_id): array
 
     return $tickets;
 }
-
-// Ответ
-$out->success = '1';
-$out->make_resp('');
