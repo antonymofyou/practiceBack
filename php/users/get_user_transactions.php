@@ -6,14 +6,14 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 // Класс запроса
-class UsersSpisaniyaAdm extends MainRequestClass {
+class UsersGetUserTransactions extends MainRequestClass {
     public $userVkId = ''; // Идентификатор ВК пользователя
 }
-$in = new UsersSpisaniyaAdm();
+$in = new UsersGetUserTransactions();
 $in->from_json(file_get_contents('php://input'));
 
 // Класс ответа
-class UsersSpisaniyaAdmResponse  extends MainResponseClass {
+class UsersGetUserTransactionsResponse  extends MainResponseClass {
 
     //Текущий баланс
     public $balanceNow = '';
@@ -28,9 +28,9 @@ class UsersSpisaniyaAdmResponse  extends MainResponseClass {
         - bsTime - Время транзакции
         - bsValue - Сумма транзакции
     */
-    public $balanceStory = [];
+    public $transactions = [];
 }
-$out = new UsersSpisaniyaAdmResponse();
+$out = new UsersGetUserTransactionsResponse();
 
 //Проверка пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
@@ -70,9 +70,9 @@ $stmt = $pdo->prepare("
 $stmt->execute([
     'userVkId' => $in->userVkId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
-//Пополняем массив $out->balanceStory
+//Пополняем массив $out->transactions
 while ($item = $stmt->fetch(PDO::FETCH_ASSOC)) {
-    $out->balanceStory[] = [
+    $out->transactions[] = [
         'bsId' => (string) $item['bs_id'],
         'bsOrderId' => (string) $item['bs_order_id'],
         'bsCommentId' => (string) $item['bs_comment'],

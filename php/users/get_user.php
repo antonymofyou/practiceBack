@@ -6,14 +6,14 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 // Класс запроса
-class UsersChangeUser extends MainRequestClass {
+class UsersGetUser extends MainRequestClass {
     public $userVkId = ''; // Идентификатор ВК пользователя
 }
-$in = new UsersChangeUser();
+$in = new UsersGetUser();
 $in->from_json(file_get_contents('php://input'));
 
 // Класс ответа
-class UsersChangeUserResponse  extends MainResponseClass {
+class UsersGetUserResponse  extends MainResponseClass {
 
     /*  Словарь со следующими полями:
      *  - userVkId - ВК ID пользователя
@@ -39,9 +39,9 @@ class UsersChangeUserResponse  extends MainResponseClass {
      *  - userStartCourseDate - Дата первой оплаты
      *  - userRegion - Регион пользователя
      */
-    public $changeUser = [];
+    public $userInfo = [];
 }
-$out = new UsersChangeUserResponse();
+$out = new UsersGetUserResponse();
 
 
 //Подключение к БД
@@ -87,33 +87,33 @@ $stmt = $pdo->prepare("
 $stmt->execute([
     'userVkId' => $in->userVkId
 ]) or $out->make_wrong_resp('Ошибка базы данных: Выполнение запроса (2)');
-$changeUser = $stmt->fetch(PDO::FETCH_ASSOC);
+$userInfo = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
 //Формируем ответ
-$out->changeUser = [
-    'userVkId' => (string) $changeUser['user_vk_id'],
+$out->userInfo = [
+    'userVkId' => (string) $userInfo['user_vk_id'],
     'userPromo' => (string) $promocode,
-    'userReferer' => (string) $changeUser['user_referer'],
-    'userAvaLink' => (string) $changeUser['user_ava_link'],
-    'userName' => (string) $changeUser['user_name'],
-    'userSurname' => (string) $changeUser['user_surname'],
-    'userOtch' => (string) $changeUser['user_otch'],
-    'userCurator' => (string) $changeUser['user_curator'],
-    'userCuratorDz' => (string) $changeUser['user_curator_dz'],
-    'userCuratorZach' => (string) $changeUser['user_curator_zach'],
-    'userBlocked' => (string) $changeUser['user_blocked'],
-    'userBdate' => (string) $changeUser['user_bdate'],
-    'userTel' => (string) $changeUser['user_tel'],
-    'userEmail' => (string) $changeUser['user_email'],
-    'userType' => (string) $changeUser['user_type'],
-    'userTarif' => (string) $changeUser['user_tarif'],
-    'userTarifNum' => (string) $changeUser['user_tarif_num'],
-    'userZachet' => (string) $changeUser['user_zachet'],
-    'userPayday' => (string) $changeUser['user_payday'],
-    'userClassNumber' => (string) $changeUser['user_class_number'],
-    'userStartCourseDate' => (string) $changeUser['user_start_course_date'],
-    'userRegion' => (string) $changeUser['user_region']
+    'userReferer' => (string) $userInfo['user_referer'],
+    'userAvaLink' => (string) $userInfo['user_ava_link'],
+    'userName' => (string) $userInfo['user_name'],
+    'userSurname' => (string) $userInfo['user_surname'],
+    'userOtch' => (string) $userInfo['user_otch'],
+    'userCurator' => (string) $userInfo['user_curator'],
+    'userCuratorDz' => (string) $userInfo['user_curator_dz'],
+    'userCuratorZach' => (string) $userInfo['user_curator_zach'],
+    'userBlocked' => (string) $userInfo['user_blocked'],
+    'userBdate' => (string) $userInfo['user_bdate'],
+    'userTel' => (string) $userInfo['user_tel'],
+    'userEmail' => (string) $userInfo['user_email'],
+    'userType' => (string) $userInfo['user_type'],
+    'userTarif' => (string) $userInfo['user_tarif'],
+    'userTarifNum' => (string) $userInfo['user_tarif_num'],
+    'userZachet' => (string) $userInfo['user_zachet'],
+    'userPayday' => (string) $userInfo['user_payday'],
+    'userClassNumber' => (string) $userInfo['user_class_number'],
+    'userStartCourseDate' => (string) $userInfo['user_start_course_date'],
+    'userRegion' => (string) $userInfo['user_region']
 ];
 
 $out->success = "1";
