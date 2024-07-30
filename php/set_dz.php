@@ -143,15 +143,15 @@ if($in->action == "create") { //Тут делаем создание
     //Вставляем задание в базу данных
     $stmt = $pdo->prepare("
         INSERT INTO `home_tasks`
-        (`ht_number`, `ht_nums_p1`, `ht_nums_p1_dop`, `ht_nums_p2`, `type_p1`, `add_other_tasks_p1`, `add_other_tasks_p2`, `ht_status`, `ht_deadline`, `ht_deadline_time`, `ht_deadline_cur`, `ht_comment`, `is_probnik`, `timer_seconds_p1`, 'timer_seconds_p2')
-        VALUES (:htNumber, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+        (`ht_number`, `ht_nums_p1`, `ht_nums_p1_dop`, `ht_nums_p2`, `type_p1`, `add_other_tasks_p1`, `add_other_tasks_p2`, `ht_status`, `ht_deadline`, `ht_deadline_time`, `ht_deadline_cur`, `ht_coment`, `is_probnik`, `timer_seconds_p1`, `timer_seconds_p2`)
+        VALUES (:htNumber, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT);
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (5)');
     $stmt->execute([
         'htNumber' => $in->htNumber,
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (5)');
     $stmt->closeCursor(); unset($stmt);
 
-    $in->htNumber = $pdo->lastInsertId(); if(!$in->htNumber) $out->make_wrong_resp('Произошла ошибка при создании задания');
+    //$in->htNumber = $pdo->lastInsertId(); if(!$in->htNumber) $out->make_wrong_resp('Произошла ошибка при создании задания');
 
     //Формируем таблицу перекрёстной проверки на созданное ДЗ
     //Формируем список кураторов, формируем перекрестные только тем, у кого есть ученики. Эксперты тут автоматом выпадут.
@@ -268,7 +268,7 @@ if($in->action == "update"){ //Тут начинается действие Upda
     //htComment
     if (isset($in->htUpdate['htComment'])) {
         if (!is_string($in->htUpdate['htComment'])) $out->make_wrong_resp("Поле 'htComment' задано некорректно");
-        $changes['ht_comment'] = $in->htUpdate['htComment'];
+        $changes['ht_coment'] = $in->htUpdate['htComment'];
     }
 
     //isProbnik
@@ -314,7 +314,7 @@ if($in->action == "update"){ //Тут начинается действие Upda
 
 //Получение всех данных о задании из таблицы home_tasks
 $stmt = $pdo->prepare("
-    SELECT `ht_number`, `ht_nums_p1`, `ht_nums_p1_dop`, `ht_nums_p2`, `type_p1`, `add_other_tasks_p1`, `add_other_tasks_p2`, `ht_status`, `ht_deadline`, `ht_deadline_time`, DATE_FORMAT(`ht_deadline_cur`, '%Y-%m-%dT%H:%i') AS `ht_deadline_cur`, `ht_comment`, `is_probnik`, `timer_seconds_p1`, `timer_seconds_p2`
+    SELECT `ht_number`, `ht_nums_p1`, `ht_nums_p1_dop`, `ht_nums_p2`, `type_p1`, `add_other_tasks_p1`, `add_other_tasks_p2`, `ht_status`, `ht_deadline`, `ht_deadline_time`, DATE_FORMAT(`ht_deadline_cur`, '%Y-%m-%dT%H:%i') AS `ht_deadline_cur`, `ht_coment`, `is_probnik`, `timer_seconds_p1`, `timer_seconds_p2`
     FROM `home_tasks` 
     WHERE `ht_number` = :htNumber;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (10)');
@@ -383,7 +383,7 @@ $out->homeTask = [
     'htDeadline' => (string) $homeTask['ht_deadline'],
     'htDeadlineTime' => (string) $homeTask['ht_deadline_time'],
     'htDeadlineCur' => (string) $homeTask['ht_deadline_cur'],
-    'htComment' => (string) $homeTask['ht_comment'],
+    'htComment' => (string) $homeTask['ht_coment'],
     'isProbnik' => (string) $homeTask['is_probnik'],
     'timerSecondsP1' => (string) $homeTask['timer_seconds_p1'],
     'timerSecondsP2' => (string) $homeTask['timer_seconds_p2']
