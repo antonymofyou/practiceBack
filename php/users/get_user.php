@@ -39,7 +39,7 @@ class UsersGetUserResponse  extends MainResponseClass {
      *  - userStartCourseDate - Дата первой оплаты
      *  - userRegion - Регион пользователя
      */
-    public $userInfo = [];
+    public $user = []; //Словарь с информацией о пользователе
 }
 $out = new UsersGetUserResponse();
 
@@ -80,40 +80,40 @@ $promocode = str_replace($numbers, $letters, $in->userVkId);
 
 //Получаем данные
 $stmt = $pdo->prepare("
-    SELECT `user_vk_id`, `user_referer`, `user_ava_link,` `user_name`, `user_surname`, `user_otch`, `user_curator`, `user_curator_dz`, `user_curator_zach`, `user_blocked`, `user_bdate`, `user_tel`, `user_email`, `user_type`, `user_tarif`, `user_tarif_num`, `user_zachet`, `user_payday`, `user_class_number`, `user_start_course_date`, `user_region`
+    SELECT `user_vk_id`, `user_referer`, `user_ava_link`, `user_name`, `user_surname`, `user_otch`, `user_curator`, `user_curator_dz`, `user_curator_zach`, `user_blocked`, `user_bdate`, `user_tel`, `user_email`, `user_type`, `user_tarif`, `user_tarif_num`, `user_zachet`, `user_payday`, `user_class_number`, `user_start_course_date`, `user_region`
     FROM `users`
     WHERE `user_vk_id` = :userVkId;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
 $stmt->execute([
     'userVkId' => $in->userVkId
 ]) or $out->make_wrong_resp('Ошибка базы данных: Выполнение запроса (2)');
-$userInfo = $stmt->fetch(PDO::FETCH_ASSOC);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
 //Формируем ответ
-$out->userInfo = [
-    'userVkId' => (string) $userInfo['user_vk_id'],
+$out->user = [
+    'userVkId' => (string) $user['user_vk_id'],
     'userPromo' => (string) $promocode,
-    'userReferer' => (string) $userInfo['user_referer'],
-    'userAvaLink' => (string) $userInfo['user_ava_link'],
-    'userName' => (string) $userInfo['user_name'],
-    'userSurname' => (string) $userInfo['user_surname'],
-    'userOtch' => (string) $userInfo['user_otch'],
-    'userCurator' => (string) $userInfo['user_curator'],
-    'userCuratorDz' => (string) $userInfo['user_curator_dz'],
-    'userCuratorZach' => (string) $userInfo['user_curator_zach'],
-    'userBlocked' => (string) $userInfo['user_blocked'],
-    'userBdate' => (string) $userInfo['user_bdate'],
-    'userTel' => (string) $userInfo['user_tel'],
-    'userEmail' => (string) $userInfo['user_email'],
-    'userType' => (string) $userInfo['user_type'],
-    'userTarif' => (string) $userInfo['user_tarif'],
-    'userTarifNum' => (string) $userInfo['user_tarif_num'],
-    'userZachet' => (string) $userInfo['user_zachet'],
-    'userPayday' => (string) $userInfo['user_payday'],
-    'userClassNumber' => (string) $userInfo['user_class_number'],
-    'userStartCourseDate' => (string) $userInfo['user_start_course_date'],
-    'userRegion' => (string) $userInfo['user_region']
+    'userReferer' => (string) $user['user_referer'],
+    'userAvaLink' => (string) $user['user_ava_link'],
+    'userName' => (string) $user['user_name'],
+    'userSurname' => (string) $user['user_surname'],
+    'userOtch' => (string) $user['user_otch'],
+    'userCurator' => (string) $user['user_curator'],
+    'userCuratorDz' => (string) $user['user_curator_dz'],
+    'userCuratorZach' => (string) $user['user_curator_zach'],
+    'userBlocked' => (string) $user['user_blocked'],
+    'userBdate' => (string) $user['user_bdate'],
+    'userTel' => (string) $user['user_tel'],
+    'userEmail' => (string) $user['user_email'],
+    'userType' => (string) $user['user_type'],
+    'userTarif' => (string) $user['user_tarif'],
+    'userTarifNum' => (string) $user['user_tarif_num'],
+    'userZachet' => (string) $user['user_zachet'],
+    'userPayday' => (string) $user['user_payday'],
+    'userClassNumber' => (string) $user['user_class_number'],
+    'userStartCourseDate' => (string) $user['user_start_course_date'],
+    'userRegion' => (string) $user['user_region']
 ];
 
 $out->success = "1";

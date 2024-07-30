@@ -16,7 +16,7 @@ $in->from_json(file_get_contents('php://input'));
 class UsersGetUserTransactionsResponse  extends MainResponseClass {
 
     //Текущий баланс
-    public $balanceNow = '';
+    public $balance = '';
 
     /* Массив словарей со следующими полями:
         - bsId - Идентификатор транзакции
@@ -28,9 +28,20 @@ class UsersGetUserTransactionsResponse  extends MainResponseClass {
         - bsTime - Время транзакции
         - bsValue - Сумма транзакции
     */
-    public $transactions = [];
+    public $transactions = []; // Массив транзакций
 }
 $out = new UsersGetUserTransactionsResponse();
+
+//Подключение к БД
+try {
+    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_DATABASE_SOCEGE . ";charset=" . DB_CHARSET, DB_USER, DB_PASSWORD, DB_SSL_FLAG === MYSQLI_CLIENT_SSL ? [
+        PDO::MYSQL_ATTR_SSL_CA => DB_SSL_CA,
+        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
+        PDO::MYSQL_ATTR_MULTI_STATEMENTS => false,
+    ] : [PDO::MYSQL_ATTR_MULTI_STATEMENTS => false]);
+} catch (PDOException $exception) {
+    $out->make_wrong_resp('Нет соединения с базой данных');
+}
 
 //Проверка пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
@@ -58,31 +69,34 @@ $stmt = $pdo->prepare("
 $stmt->execute([
     'userVkId' => $in->userVkId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
-$balanceNow = $stmt->fetch(PDO::FETCH_ASSOC);
+$balance = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
 //Получаем массив данных о прошлых транзакциях
 $stmt = $pdo->prepare("
     SELECT `bs_id`, `bs_order_id`, `bs_comment`, `bs_type`, `bs_value`, `bs_date`, `bs_time`, `bs_changer`
     FROM `balance_story`
-    WHERE `bs_user_id` = :userVkId;
+    WHERE `bs_user_id` = :userVkId
+    ORDER BY `bs_id` DESC;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
 $stmt->execute([
     'userVkId' => $in->userVkId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
 //Пополняем массив $out->transactions
-while ($item = $stmt->fetch(PDO::FETCH_ASSOC)) {
+while ($transaction = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $out->transactions[] = [
-        'bsId' => (string) $item['bs_id'],
-        'bsOrderId' => (string) $item['bs_order_id'],
-        'bsCommentId' => (string) $item['bs_comment'],
-        'bsType' => (string) $item['bs_type'],
-        'bsValue' => (string) $item['bs_value'],
-        'bsDate' => (string) $item['bs_date'],
-        'bsTime' => (string) $item['bs_time'],
-        'bsChanger' => (string) $item['bs_changer']
+        'bsId' => (string) $transaction['bs_id'],
+        'bsOrderId' => (string) $transaction['bs_order_id'],
+        'bsCommentId' => (string) $transaction['bs_comment'],
+        'bsType' => (string) $transaction['bs_type'],
+        'bsValue' => (string) $transaction['bs_value'],
+        'bsDate' => (string) $transaction['bs_date'],
+        'bsTime' => (string) $transaction['bs_time'],
+        'bsChanger' => (string) $transaction['bs_changer']
     ];
 } $stmt->closeCursor(); unset($stmt);
+
+$out->balance = (string) $balance['bn_balance'];
 
 $out->success = "1";
 $out->make_resp('');
