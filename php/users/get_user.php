@@ -23,9 +23,9 @@ class UsersGetUserResponse  extends MainResponseClass {
      *  - userName - Имя пользователя
      *  - userSurname - Фамилия пользователя
      *  - userOtch - Отчество пользователя
-     *  - userCurator - Куратор пользователя
-     *  - userCuratorDz - Куратор(ДЗ)
-     *  - userCuratorZach - Куратор(Зачёт)
+     *  - userCurator - ВК ИД куратора пользователя
+     *  - userCuratorDz - ВК ИД куратора(ДЗ)
+     *  - userCuratorZach - ВК ИД куратора(Зачёт)
      *  - userBlocked - Заблокирован ли пользователь
      *  - userBdate - День рождения пользователя
      *  - userTel - Телефон пользователя
@@ -37,7 +37,7 @@ class UsersGetUserResponse  extends MainResponseClass {
      *  - userPayday - День оплаты пользователя, 1-31
      *  - userClassNumber - Класс пользователя
      *  - userStartCourseDate - Дата первой оплаты
-     *  - userRegion - Регион пользователя
+     *  - userRegion - Идентификатор региона пользователя
      */
     public $user = []; //Словарь с информацией о пользователе
 }
@@ -72,7 +72,7 @@ if (((string) (int) $in->userVkId) !== ((string) $in->userVkId) || (int) $in->us
     if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Пользователь с ВК ID {$in->userVkId} не найден");
     $stmt->closeCursor(); unset($stmt);
 
-//Преобразуем промокод в ID реферера
+//Преобразуем промокод в реферальный ID
 //0-B 1-C 2-D 3-E 4-F 5-G 6-H 7-K 8-L 9-M
 $letters = array('B', 'C', 'D', 'E', 'F', 'G', 'H', 'K', 'L', 'M');
 $numbers = array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9');
