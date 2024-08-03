@@ -7,16 +7,16 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 
 // класс запроса
-class SupportMakeMessage extends MainRequestClass {
+class SupportTicketDztMakeMessage extends MainRequestClass {
 	public $ticketId = ''; // id заявки
 	public $responceVkId = ''; // ответственный по заявке
 	public $ticketType = ''; // тип заявки (не обяз.)
 	public $comment = ''; // тело сообщения(не обяз.)
 	public $importance = ''; // важность заявки (не обяз., по умолчанию 5 - обычная)
 	public $status = ''; // статус заявки (не обяз., по умолчанию 0 - новая)
-	public $ticketDeadline = ''; // срок рассмотрения заявки (не обяз., по умолчанию null)
+	public $ticketDeadline = ''; // срок рассмотрения заявки (не обяз., по умолчанию NULL)
 }
-$in = new SupportMakeMessage();
+$in = new SupportTicketDztMakeMessage();
 $in->from_json(file_get_contents('php://input'));
 
 // класс ответа
@@ -70,15 +70,18 @@ if (!in_array($in->ticketType, ['1', '2', '5', '6', '7', '10']) && !empty($in->t
 
 //--------------------------------Валидация $in->status
 if (!in_array($in->status, ['0', '1', '5', '10']) && !empty($in->status)) $out->make_wrong_resp("Параметр 'status' задан некорректно");
+else $in->importance = '0';
 
 //--------------------------------Валидация $in->importance
 if (!in_array($in->importance, ['5', '10']) && !empty($in->importance)) $out->make_wrong_resp("Параметр 'importance' задан некорректно");
+else $in->importance = '5';
 
 //--------------------------------Валидация $in->comment
 if (!is_string($in->comment)) $out->make_wrong_resp("Параметр 'comment' задан некорректно");
 
 //--------------------------------Валидация $in->ticketDeadline
 if (!is_string($in->ticketDeadline)) $out->make_wrong_resp("Параметр 'ticketDeadline' задан некорректно");
+else $in->importance = 'NULL';
 
 //--------------------------------Массив статусов
 $statusToText = [
@@ -163,7 +166,7 @@ foreach($ticket as $key => $value){
         }
     }         
 }
-if($flagChanged == 1){$ticket_message_change = substr($ticket_message_change,0,-2);}
+if($flagChanged == 1){$ticketMessage = substr($ticketMessage,0,-2);}
 
 //--------------------------------Изменение заявки
 $stmt = $pdo->prepare(
