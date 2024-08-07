@@ -5,7 +5,7 @@ header('Content-Type: application/json; charset=utf-8');
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
-class EmployeeSetStaff extends MainRequestClass {
+class EmployeeStaffSetStaff extends MainRequestClass {
     public $staffId = ''; // Идентификатор сотрудника
 
     public $action = ''; // Кодовое слово для одного из действий: create - добавление данных сотрудника, update - обновление данных сотрудника или delete - удаление данных сотрудника
@@ -21,10 +21,10 @@ class EmployeeSetStaff extends MainRequestClass {
     public $set = []; //Словарь с данными сотрудника для создания или обновления
 
 }
-$in = new EmployeeSetStaff();
+$in = new EmployeeStaffSetStaff();
 $in->from_json(file_get_contents('php://input'));
 
-class EmployeeSetStaffResponse extends MainResponseClass {
+class EmployeeStaffSetStaffResponse extends MainResponseClass {
 
     /* Словарь с данными сотрудника
         - id - Идентификатор сотрудника
@@ -38,14 +38,14 @@ class EmployeeSetStaffResponse extends MainResponseClass {
     public $info = []; // Словарь с информацией о сотруднике
 
     /* Массив словарей со следующими полями:
-        - staff_id - Идентификатор соответствующего сотрудника
+        - staffId - Идентификатор соответствующего сотрудника
         - field - Наименование личных данных 
         - value - Значение личных данных, необязательно
         - comment - Комментарий к полю, необязательно
     */
     public $fields = []; // Поля с личными данными
 }
-$out = new EmployeeSetStaffResponse();
+$out = new EmployeeStaffSetStaffResponse();
 
 //Подключение к БД
 try {
@@ -106,26 +106,10 @@ if($in->action == 'delete') //Удаляем сотрудника
 
 if($in->action == 'create') //Создаём сотрудника
 {
-    //Валидация staffId, только если staffId задан
-    if($in->staffId != '') {
-        if (((string) (int) $in->staffId) !== ((string) $in->staffId) || (int) $in->staffId <= 0) $out->make_wrong_resp("Параметр 'staffId' задан некорректно");
-            $stmt = $pdo->prepare("
-                SELECT `id`
-                FROM `staff`
-                WHERE `id` = :staffId;
-            ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
-            $stmt->execute([
-                'staffId' => $in->staffId
-            ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
-            if ($stmt->rowCount() != 0) $out->make_wrong_resp("Ошибка: Сотрудник с ID {$in->staffId} уже существует");
-            $stmt->closeCursor(); unset($stmt);
-    } else $in->staffId = null; //иначе в запрос передаётся null, чтобы создать задание с новым номером
-
-
     $set = []; //Словарь с валидированными значениями для создания
 
-    //staffId - Уже валидировано
-    $set['staffId'] = $in->staffId;
+    //staffId - Ставим null чтобы ID сам создался в базе
+    $set['staffId'] = null;
     
     //Валидация $in->set[...], если хоть одно поле не задано - выводим ошибку, кроме blocked
     //vkId - проверяем, нет ли ещё сотрудников с таким же vkId
@@ -296,10 +280,10 @@ $stmt = $pdo->prepare("
     SELECT `staff_id`, `field`, `value`, `comment`
     FROM `staff_pers_data`
     WHERE `staff_id` = :staffId;
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (8)');
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (11)');
 $stmt->execute([
     'staffId' => $in->staffId
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (8)');
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (11)');
 //Формируем ответ с личными данными сотрудника
 $fields = [];
 while ($field = $stmt->fetch(PDO::FETCH_ASSOC)) {

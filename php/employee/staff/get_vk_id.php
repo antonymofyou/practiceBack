@@ -5,17 +5,23 @@ header('Content-Type: application/json; charset=utf-8');
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
-class EmployeeGetVkId extends MainRequestClass {
+class EmployeeStaffGetVkId extends MainRequestClass {
     public $url = ''; //Ссылка на профиль ВК
 }
 
-$in = new EmployeeGetVkId();
+$in = new EmployeeStaffGetVkId();
 $in->from_json(file_get_contents('php://input'));
 
-class EmployeeGetVkIdResponse extends MainResponseClass {
-    public $vkId = ''; //Идентификатор профиля ВК
+class EmployeeStaffGetVkIdResponse extends MainResponseClass {
+    /* Словарь со следующими полями:
+        - vkId - Идентификатор ВК
+        - vkName - Имя профиля ВК
+        - vkLast - Фамилия профиля ВК
+        - vkNick - Отчество или прозвище профиля ВК, может быть пустым
+    */
+    public $vkInfo = []; //Имя, Фамилия, Отчество и Идентификатор ВК
 }
-$out = new EmployeeGetVkIdResponse();
+$out = new EmployeeStaffGetVkIdResponse();
 
 //Подключение к БД
 try {
@@ -34,30 +40,27 @@ if (!in_array($user_type, ['Админ'])) $out->make_wrong_resp('Ошибка �
 
 $screenName = ltrim(parse_url($in->url, PHP_URL_PATH), "/"); //Парсим ссылку, убираем слева лишний / и получаем короткое имя профиля
 
-//Делаем запрос в АПИ ВК на метод users.get на короткое имя профиля
+//Делаем запрос в АПИ ВК на метод users.get на короткое имя профиля, задаём запрос на отчество и на ответ на русском
 $curl = curl_init();
-curl_setopt($curl, CURLOPT_URL, 'https://api.vk.com/method/users.get?user_id=' . $screenName . '&access_token=' . VK_SERVICE_KEY . "&v=" . VK_API_VERSION);
+curl_setopt($curl, CURLOPT_URL, 'https://api.vk.com/method/users.get?user_id=' . $screenName . '&fields=nickname' . '&lang=ru' . '&access_token=' . VK_SERVICE_KEY . "&v=" . VK_API_VERSION);
 curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-$response = (array) json_decode(curl_exec($curl)); //Проводим запрос и получем словарь с одним массивом с одним словарём
+$response = json_decode(curl_exec($curl), true); //Проводим запрос и получем словарь с одним массивом с одним словарём
 curl_close($curl);
 
 //Если ВК ответил ошибкой, то выводим ошибку
 if(array_key_exists('error', $response)) {
-    $error = (array) $response['error'];
-    $errorCode = $error['error_code'];
-    $errorMessage = $error['error_msg'];
+    $errorCode = $response['error']['error_code'];
+    $errorMessage = $response['error']['error_msg'];
     $out->make_wrong_resp("Произошла ошибка VK, код ошибки: [$errorCode]: {$errorMessage}");
 }
 //Если получен пустой ответ, то выводим ошибку
 if(empty($response['response'])) $out->make_wrong_resp('Пользователь ВК не найден');
 
-//Добираемся до ВК ID
-$response = (array) $response['response'];
-$response = (array) $response[0];
-$response = $response['id'];
-
-//Возвращаем ВК ID
-$out->vkId = $response;
+//Вкладываем данные в возврат
+$out->vkInfo['vkId'] = $response['response'][0]['id'];
+$out->vkInfo['vkName'] = $response['response'][0]['first_name'];
+$out->vkInfo['vkLast'] = $response['response'][0]['last_name'];
+$out->vkInfo['vkNick'] = $response['response'][0]['nickname'];
 
 $out->success = "1";
 $out->make_resp('');

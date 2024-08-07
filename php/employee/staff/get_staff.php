@@ -5,13 +5,13 @@ header('Content-Type: application/json; charset=utf-8');
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
-class EmployeeGetStaff extends MainRequestClass {
+class EmployeeStaffGetStaff extends MainRequestClass {
     public $staffId = ''; //Идентификатор сотрудника
 }
-$in = new EmployeeGetStaff();
+$in = new EmployeeStaffGetStaff();
 $in->from_json(file_get_contents('php://input'));
 
-class EmployeeGetStaffResponse extends MainResponseClass {
+class EmployeeStaffGetStaffResponse extends MainResponseClass {
     /* Словарь с данными сотрудника
         - staffId - Идентификатор сотрудника
         - vkId - Идентификатор профиля ВК сотрудника
@@ -24,14 +24,14 @@ class EmployeeGetStaffResponse extends MainResponseClass {
     public $info = []; // Словарь с возвращаемыми данными сотрудника
 
     /* Массив словарей со следующими полями:
-        - staff_id - Идентификатор соответствующего сотрудника
+        - staffId - Идентификатор соответствующего сотрудника
         - field - Наименование личных данных 
         - value - Значение личных данных, необязательно
         - comment - Комментарий к полю, необязательно
     */
     public $fields = []; // Массив словарей с личными данными
 }
-$out = new EmployeeGetStaffResponse();
+$out = new EmployeeStaffGetStaffResponse();
 
 
 //Подключение к БД
