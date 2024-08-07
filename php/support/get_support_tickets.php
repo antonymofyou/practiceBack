@@ -4,7 +4,6 @@ header('Content-Type: application/json; charset=utf-8');
 
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
-require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
 
 // Класс запроса
 $in = new MainRequestClass();
@@ -42,9 +41,6 @@ class SupportGetSupportTicketsResp extends MainResponseClass
 
 $out = new SupportGetSupportTicketsResp();
 
-// Проверка пользователя
-in_array($user_type, ['Куратор', 'Админ']) or $out->make_wrong_resp("Ошибка доступа");
-
 // Подключение к БД
 try {
     $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_DATABASE_SOCEGE . ";charset=" . DB_CHARSET, DB_USER, DB_PASSWORD, DB_SSL_FLAG === MYSQLI_CLIENT_SSL ? [
@@ -55,6 +51,10 @@ try {
 } catch (PDOException $exception) {
     $out->make_wrong_resp("Нет соединения с базой данных");
 }
+
+// Проверка пользователя
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
+in_array($user_type, ['Куратор', 'Админ']) or $out->make_wrong_resp("Ошибка доступа");
 
 // Получаем заявки для администратора
 if ($user_type == 'Админ') {
