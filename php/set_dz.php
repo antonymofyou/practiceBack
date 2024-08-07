@@ -7,73 +7,61 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 //класс запроса
 class SetHometask extends MainRequestClass { 
-    public $htNumber = ''; // ключ дз
+    public $htNumber = ''; // Номер задания
 
-    public $htUpdate = []; /* словарь с данными для обновления
-
-    htNumsP1 INT - Количество вопросов из первой части
-    htNumsP1Dop INT - Количество дополнительных вопросов из первой части
-    htNumsP2 INT - Количество вопросов из второй части
-    typeP1 TEXT - Тип вопросов: Вопросыизурона или КаквЕГЭ
-    addOtherTasksP1 BOOLEAN - Добавить задания Ч1 из других уроков в случае нехватки
-    addOtherTasksP2 BOOLEAN - Добавить задания Ч2 из других уроков в случае нехватки
-    htStatus TEXT - Статус задания: Новое, Выполнение, Проверка или Завершено
-    htDeadline DATE - День дедлайна
-    htDeadlineTime TIME - Время дедлайна 
-    htDeadlineCur DATETIME - Дедлайн проверки кураторов 
-    htComment TEXT - 
-    isProbnik BOOLEAN - Является ли пробником 
-    timerSecondsP1 INT - Времени на Ч1 минут
-    timerSecondsP2 INT - Времени на Ч2 минут
-
+    /* Словарь со следующими полями:
+        - htNumsP1 INT - Количество вопросов из первой части
+        - htNumsP1Dop INT - Количество дополнительных вопросов из первой части
+        - htNumsP2 INT - Количество вопросов из второй части
+        - typeP1 TEXT - Тип вопросов: Вопросыизурона или КаквЕГЭ
+        - addOtherTasksP1 BOOLEAN - Добавить задания Ч1 из других уроков в случае нехватки
+        - addOtherTasksP2 BOOLEAN - Добавить задания Ч2 из других уроков в случае нехватки
+        - htStatus TEXT - Статус задания: Новое, Выполнение, Проверка или Завершено
+        - htDeadline DATE - День дедлайна
+        - htDeadlineTime TIME - Время дедлайна 
+        - htDeadlineCur DATETIME - Дедлайн проверки кураторов 
+        - htComment TEXT - ?
+        - isProbnik BOOLEAN - Является ли пробником 
+        - timerSecondsP1 INT - Время на Ч1, минуты
+        - timerSecondsP2 INT - Время на Ч2, минуты
     */
+    public $htUpdate = []; // Данные для обновления задания
 
-
-    public $action = ''; // одно из: create, update или delete
-    /* 
-    create - создаёт незаполненное домашнее задание с номером и возвращает этот номер
-    update - обновляет домашнее задание
-    delete - удаляет домашнее задание
-    */
-
+    public $action = ''; // Одно из: create - создаёт пустое задание, update - обновляет задание или delete - удаляет задание
+    
 }
-
 $in = new SetHometask();
 $in->from_json(file_get_contents('php://input'));
-
-
 
 
 //класс ответа
 class SetHometaskResponse extends MainResponseClass {
 
-    public $homeTask = []; /* Словарь с данными дз
-
-    htNumber INT PRIMARY KEY - Номер задания
-    htNumsP1 INT - Количество вопросов из первой части
-    htNumsP1Dop INT - Количество дополнительных вопросов из первой части
-    htNumsP2 INT - Количество вопросов из второй части
-    typeP1 TEXT - Тип вопросов: Вопросыизурона или КаквЕГЭ
-    addOtherTasksP1 BOOLEAN - Добавить задания Ч1 из других уроков в случае нехватки
-    addOtherTasksP2 BOOLEAN - Добавить задания Ч2 из других уроков в случае нехватки
-    htStatus TEXT - Статус задания: Новое, Выполнение, Проверка или Завершено
-    htDeadline DATE - День дедлайна
-    htDeadlineTime TIME - Время дедлайна 
-    htDeadlineCur DATETIME - Дедлайн проверки кураторов 
-    htComment TEXT 
-    isProbnik BOOLEAN - Является ли пробником 
-    timerSecondsP1 INT - Времени на Ч1 минут
-    timerSecondsP2 INT - Времени на Ч2 минут
-
+    /* Словарь со следующими полями:
+        - htNumber INT PRIMARY KEY - Номер задания
+        - htNumsP1 INT - Количество вопросов из первой части
+        - htNumsP1Dop INT - Количество дополнительных вопросов из первой части
+        - htNumsP2 INT - Количество вопросов из второй части
+        - typeP1 TEXT - Тип вопросов: Вопросыизурока или КаквЕГЭ
+        - addOtherTasksP1 BOOLEAN - Добавить задания Ч1 из других уроков в случае нехватки
+        - addOtherTasksP2 BOOLEAN - Добавить задания Ч2 из других уроков в случае нехватки
+        - htStatus TEXT - Статус задания: Новое, Выполнение, Проверка или Завершено
+        - htDeadline DATE - День дедлайна
+        - htDeadlineTime TIME - Время дедлайна 
+        - htDeadlineCur DATETIME - Дедлайн проверки кураторов 
+        - htComment TEXT - ?
+        - isProbnik BOOLEAN - Является ли пробником 
+        - timerSecondsP1 INT - Время на Ч1, минуты
+        - timerSecondsP2 INT - Время на Ч2, минуты
     */
+    public $homeTask = []; // Возвращаемые данные задания
 
-    public $questions = []; /* Словарь с данными о количестве вопросов для этого задания
-
-    numsP1 INT - Количество доступных вопросов 1 части
-    numsP1Dop INT - Количество доступных дополнительных вопросов 1 части
-    numsP2 INT - Количество доступных вопросов 2 части
-
+    /* Словарь со следующими полями:
+        - numsP1 INT - Количество доступных вопросов 1 части
+        - numsP1Dop INT - Количество доступных дополнительных вопросов 1 части
+        - numsP2 INT - Количество доступных вопросов 2 части
     */
+    public $questions = []; // Возвращаемые данные о количестве вопросов к заданию
 
 }
 $out = new SetHometaskResponse();
@@ -99,21 +87,22 @@ if($in->action != "delete" && $in->action != "update" && $in->action != "create"
 if($in->action == "delete"){ //Тут удаляем строку по номеру
 
     //Валидация $in->htNumber
-    if (((string) (int) $in->htNumber) !== ((string) $in->htNumber) || (int) $in->htNumber <= 0) $out->make_wrong_resp("Номер задания задан некорректно или отсутствует");
+    if (((string) (int) $in->htNumber) !== ((string) $in->htNumber) || (int) $in->htNumber <= 0) $out->make_wrong_resp("Поле 'htNumber' задано некорректно или отсутствует (1)");
     $stmt = $pdo->prepare("
     SELECT `ht_number`
     FROM `home_tasks`
-    WHERE `ht_number` = :htNumber
+    WHERE `ht_number` = :htNumber;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
     $stmt->execute([
         'htNumber' => $in->htNumber
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
-    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Домашнее задание с номером {$in->htNumber} не найдено");
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Домашнее задание с номером {$in->htNumber} не найдено (1)");
         $stmt->closeCursor(); unset($stmt);
 
     //Удаляем задание по номеру
     $stmt = $pdo->prepare("
-    DELETE FROM `home_tasks` WHERE `ht_number` = :htNumber
+    DELETE FROM `home_tasks`
+    WHERE `ht_number` = :htNumber;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
     $stmt->execute([
         'htNumber' => $in->htNumber
@@ -122,7 +111,8 @@ if($in->action == "delete"){ //Тут удаляем строку по номе�
 
     //Удаляем перекрёстную проверку этого задания
     $stmt = $pdo->prepare("
-    DELETE FROM `cross_check` WHERE `ht_num` = :htNumber
+    DELETE FROM `cross_check` 
+    WHERE `ht_num` = :htNumber;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
     $stmt->execute([
         'htNumber' => $in->htNumber
@@ -137,11 +127,11 @@ if($in->action == "delete"){ //Тут удаляем строку по номе�
 if($in->action == "create") { //Тут делаем создание
         //Валидация htNumber, только если htNumber задан
     if($in->htNumber != '') {
-        if (((string) (int) $in->htNumber) !== ((string) $in->htNumber) || (int) $in->htNumber <= 0) $out->make_wrong_resp("Номер задания задан некорректно");
+        if (((string) (int) $in->htNumber) !== ((string) $in->htNumber) || (int) $in->htNumber <= 0) $out->make_wrong_resp("Поле 'htNumber' задано некорректно");
             $stmt = $pdo->prepare("
                 SELECT `ht_number`
                 FROM `home_tasks`
-                WHERE `ht_number` = :htNumber
+                WHERE `ht_number` = :htNumber;
             ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
             $stmt->execute([
                 'htNumber' => $in->htNumber
@@ -150,36 +140,18 @@ if($in->action == "create") { //Тут делаем создание
             $stmt->closeCursor(); unset($stmt);
     } else $in->htNumber = null; //иначе в запрос передаётся null, чтобы создать задание с новым номером
 
-    //Создаём массивы с данными для запроса INSERT со всеми полями и словарь с данными для этих полей
-    $columns = ['ht_number', 'ht_nums_p1', 'ht_nums_p1_dop', 'ht_nums_p2', 'type_p1', 'add_other_tasks_p1', 'add_other_tasks_p2', 'ht_status', 'ht_deadline', 'ht_deadline_time', 'ht_deadline_cur', 'ht_comment', 'is_probnik', 'timer_seconds_p1', 'timer_seconds_p2'];
-    $columns = join(', ', $columns);
-
-    $values = [':htNumber', ':htNumsP1', ':htNumsP1Dop', ':htNumsP2', ':typeP1', ':addOtherTasksP1', ':addOtherTasksP2', ':htStatus', ':htDeadline', ':htDeadlineTime', ':htDeadlineCur', ':htComment', ':isProbnik', ':timerSecondsP1', ':timerSecondsP2'];
-    $values = join(', ', $values);
-
-    $params = [
+    //Вставляем задание в базу данных
+    $stmt = $pdo->prepare("
+        INSERT INTO `home_tasks`
+        (`ht_number`, `ht_nums_p1`, `ht_nums_p1_dop`, `ht_nums_p2`, `type_p1`, `add_other_tasks_p1`, `add_other_tasks_p2`, `ht_status`, `ht_deadline`, `ht_deadline_time`, `ht_deadline_cur`, `ht_coment`, `is_probnik`, `timer_seconds_p1`, `timer_seconds_p2`)
+        VALUES (:htNumber, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT, DEFAULT);
+    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (5)');
+    $stmt->execute([
         'htNumber' => $in->htNumber,
-        'htNumsP1' => null,
-        'htNumsP1Dop' => null,
-        'htNumsP2' => null,
-        'typeP1' => null,
-        'addOtherTasksP1' => null,
-        'addOtherTasksP2' => null,
-        'htStatus' => null,
-        'htDeadline' => null,
-        'htDeadlineTime' => null,
-        'htDeadlineCur' => null,
-        'htComment' => null,
-        'isProbnik' => null,
-        'timerSecondsP1' => null,
-        'timerSecondsP2' => null
-    ];
-
-    $stmt = $pdo->prepare("INSERT INTO `home_tasks` ($columns) VALUES ($values)") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (5)');
-    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (5)');
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (5)');
     $stmt->closeCursor(); unset($stmt);
 
-    $in->htNumber = $pdo->lastInsertId(); if(!$in->htNumber) $out->make_wrong_resp('Произошла ошибка при создании задания');
+    //$in->htNumber = $pdo->lastInsertId(); if(!$in->htNumber) $out->make_wrong_resp('Произошла ошибка при создании задания');
 
     //Формируем таблицу перекрёстной проверки на созданное ДЗ
     //Формируем список кураторов, формируем перекрестные только тем, у кого есть ученики. Эксперты тут автоматом выпадут.
@@ -190,7 +162,7 @@ if($in->action == "create") { //Тут делаем создание
     WHERE `curators`.`user_type` = 'Куратор' AND (`curators`.`user_blocked` IS NULL OR `curators`.`user_blocked` = 0)
     GROUP BY `curators`.`user_vk_id`
     HAVING `num_students` > 0
-    ORDER BY RAND()
+    ORDER BY RAND();
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
     $stmt->execute() or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
     $curators[] = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -202,7 +174,11 @@ if($in->action == "create") { //Тут делаем создание
     ]; 
     
     //Добавляем проверку в базу данных
-    $stmt = $pdo->prepare("INSERT INTO `cross_check` (`ht_num`, `curator_vk_id`, `checker_id`) VALUES (:ht_num, :curator_vk_id, :checker_id)") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (7)');
+    $stmt = $pdo->prepare("
+    INSERT INTO `cross_check` 
+    (`ht_num`, `curator_vk_id`, `checker_id`) 
+    VALUES (:ht_num, :curator_vk_id, :checker_id);
+    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (7)');
     $stmt->execute($crossCheck) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (7)');
     $stmt->closeCursor(); unset($stmt);    
 }
@@ -211,16 +187,16 @@ if($in->action == "create") { //Тут делаем создание
 if($in->action == "update"){ //Тут начинается действие Update
 
     //Валидация $in->htNumber
-    if (((string) (int) $in->htNumber) !== ((string) $in->htNumber) || (int) $in->htNumber <= 0) $out->make_wrong_resp("Номер задания задан некорректно или отсутствует");
+    if (((string) (int) $in->htNumber) !== ((string) $in->htNumber) || (int) $in->htNumber <= 0) $out->make_wrong_resp("Поле 'htNumber' задано некорректно или отсутствует (2)");
     $stmt = $pdo->prepare("
         SELECT `ht_number`
         FROM `home_tasks`
-        WHERE `ht_number` = :htNumber
+        WHERE `ht_number` = :htNumber;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (8)');
     $stmt->execute([
         'htNumber' => $in->htNumber
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (8)');
-    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Домашнее задание с номером {$in->htNumber} не найдено");
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Домашнее задание с номером {$in->htNumber} не найдено (2)");
     $stmt->closeCursor(); unset($stmt);
 
     $changes = []; //Словарь с валидированными изменениями
@@ -246,8 +222,7 @@ if($in->action == "update"){ //Тут начинается действие Upda
 
     //typeP1
     if (isset($in->htUpdate['typeP1'])) {
-        if (mb_strlen($htUpdate['typeP1']) > 50) $out->make_wrong_resp("Поле 'typeP1' задано некорректно (1)");
-        if (!in_array($in->htUpdate['typeP1'], ["Как в ЕГЭ", "Вопросы из урока"])) $out->make_wrong_resp("Поле 'typeP1' задано некорректно (2)");
+        if (!in_array($in->htUpdate['typeP1'], ["КаквЕГЭ", "Вопросыизурока"])) $out->make_wrong_resp("Поле 'typeP1' задано некорректно");
         $changes['type_p1'] = $in->htUpdate['typeP1'];
     }
 
@@ -268,8 +243,7 @@ if($in->action == "update"){ //Тут начинается действие Upda
 
     //htStatus
     if (isset($in->htUpdate['htStatus'])) {
-        if (mb_strlen($htUpdate['htStatus']) > 50) $out->make_wrong_resp("Поле 'htStatus' задано некорректно (1)");
-        if (!in_array($in->htUpdate['htStatus'], ["Новое", "Выполнение", "Проверка", "Завершено"])) $out->make_wrong_resp("Поле 'htStatus' задано некорректно (2)");
+        if (!in_array($in->htUpdate['htStatus'], ["Новое", "Выполнение", "Проверка", "Завершено"])) $out->make_wrong_resp("Поле 'htStatus' задано некорректно");
         $changes['ht_status'] = $in->htUpdate['htStatus'];
     }
 
@@ -293,8 +267,8 @@ if($in->action == "update"){ //Тут начинается действие Upda
 
     //htComment
     if (isset($in->htUpdate['htComment'])) {
-        if (!is_string($in->htUpdate['htComment']) || (mb_strlen($htUpdate['htComment'] > 256))) $out->make_wrong_resp("Поле 'htComment' задано некорректно");
-        $changes['ht_comment'] = $in->htUpdate['htComment'];
+        if (!is_string($in->htUpdate['htComment'])) $out->make_wrong_resp("Поле 'htComment' задано некорректно");
+        $changes['ht_coment'] = $in->htUpdate['htComment'];
     }
 
     //isProbnik
@@ -328,7 +302,11 @@ if($in->action == "update"){ //Тут начинается действие Upda
     $values = join(', ', $values);
     $params['htNumber'] = $in->htNumber;
 
-    $stmt = $pdo->prepare("UPDATE `home_tasks` SET $values WHERE `ht_number` = :htNumber") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (9)');
+    $stmt = $pdo->prepare("
+        UPDATE `home_tasks` 
+        SET $values 
+        WHERE `ht_number` = :htNumber;
+    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (9)');
     $stmt->execute($params) or $out->make_wrong_resp("Ошибка базы данных: выполнение запроса (9)");
     $stmt->closeCursor(); unset($stmt);  
 }
@@ -336,14 +314,14 @@ if($in->action == "update"){ //Тут начинается действие Upda
 
 //Получение всех данных о задании из таблицы home_tasks
 $stmt = $pdo->prepare("
-    SELECT `ht_number`, `ht_nums_p1`, `ht_nums_p1_dop`, `ht_nums_p2`, `type_p1`, `add_other_tasks_p1`, `add_other_tasks_p2`, `ht_status`, `ht_deadline`, `ht_deadline_time`, DATE_FORMAT(`ht_deadline_cur`, '%Y-%m-%dT%H:%i') AS `ht_deadline_cur`, `ht_comment`, `is_probnik`, `timer_seconds_p1`, `timer_seconds_p2`
+    SELECT `ht_number`, `ht_nums_p1`, `ht_nums_p1_dop`, `ht_nums_p2`, `type_p1`, `add_other_tasks_p1`, `add_other_tasks_p2`, `ht_status`, `ht_deadline`, `ht_deadline_time`, DATE_FORMAT(`ht_deadline_cur`, '%Y-%m-%dT%H:%i') AS `ht_deadline_cur`, `ht_coment`, `is_probnik`, `timer_seconds_p1`, `timer_seconds_p2`
     FROM `home_tasks` 
-    WHERE `ht_number` = :htNumber
+    WHERE `ht_number` = :htNumber;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (10)');
 $stmt->execute([
     'htNumber' => $in->htNumber
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (10)');
-if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
+if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены (1)');
 $homeTask = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
@@ -354,12 +332,12 @@ $stmt = $pdo->prepare("
     FROM `questions`
     WHERE `q_lesson_num` = :htNumber 
     AND `q_public` = 1 
-    AND `selfmade` = 0
+    AND `selfmade` = 0;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса(11)');
 $stmt->execute([
     'htNumber' => $in->htNumber
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса(11)');
-if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
+if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены (2)');
 $numsP1 = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
@@ -369,12 +347,12 @@ $stmt = $pdo->prepare("
     FROM `questions`
     WHERE `q_lesson_num` = :htNumber 
     AND `q_public` = 1 
-    AND `selfmade` = 1
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса(13)');
+    AND `selfmade` = 1;
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса(12)');
 $stmt->execute([
     'htNumber' => $in->htNumber
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса(13)');
-if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса(12)');
+if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены (3)');
 $numsP1Dop = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
@@ -383,12 +361,12 @@ $stmt = $pdo->prepare("
     SELECT COUNT(1) AS `numsP2`
     FROM `questions2`
     WHERE `q2_lesson_num` = :htNumber 
-    AND `q2_public` = 1 
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса(12)');
+    AND `q2_public` = 1;
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса(13)');
 $stmt->execute([
     'htNumber' => $in->htNumber
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса(12)');
-if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса(13)');
+if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены (4)');
 $numsP2 = $stmt->fetch(PDO::FETCH_ASSOC); //Добавляем полученные данные в $questions
 $stmt->closeCursor(); unset($stmt);
 
@@ -405,7 +383,7 @@ $out->homeTask = [
     'htDeadline' => (string) $homeTask['ht_deadline'],
     'htDeadlineTime' => (string) $homeTask['ht_deadline_time'],
     'htDeadlineCur' => (string) $homeTask['ht_deadline_cur'],
-    'htComment' => (string) $homeTask['ht_comment'],
+    'htComment' => (string) $homeTask['ht_coment'],
     'isProbnik' => (string) $homeTask['is_probnik'],
     'timerSecondsP1' => (string) $homeTask['timer_seconds_p1'],
     'timerSecondsP2' => (string) $homeTask['timer_seconds_p2']
