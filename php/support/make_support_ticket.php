@@ -4,7 +4,6 @@ header('Content-Type: application/json; charset=utf-8');
 
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
-require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/add_task_sending_to_vk.inc.php';
 
 // Класс запроса
@@ -31,9 +30,6 @@ class SupportMakeSupportTicketResp extends MainResponseClass
 }
 
 $out = new SupportMakeSupportTicketResp();
-
-// Проверка пользователя
-in_array($user_type, ['Куратор', 'Админ']) or $out->make_wrong_resp("Ошибка доступа");
 
 // Валидация поля importance (5 - обычная, 10 - сверхсрочная)
 in_array($in->ticket['importance'], ['5', '10']) or $out->make_wrong_resp("Поле importance задано некорректно {$in->ticket['importance']}");
@@ -68,6 +64,10 @@ try {
 } catch (PDOException $exception) {
     $out->make_wrong_resp("Нет соединения с базой данных");
 }
+
+// Проверка пользователя
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
+in_array($user_type, ['Куратор', 'Админ']) or $out->make_wrong_resp("Ошибка доступа");
 
 // Создание подключения к БД для ВК бота
 $mysqli = mysqli_init();
