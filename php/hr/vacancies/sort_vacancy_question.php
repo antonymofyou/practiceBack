@@ -1,11 +1,10 @@
 <?php // [Менеджер] Сортировка вопросов вакансии
 
+global $user;
 header('Content-Type: application/json; charset=utf-8');
 
 require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/root_classes.inc.php';
-require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/check_permission.inc.php';
-require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/manager_check_user.inc.php';
 
 // Класс запроса
 class VacanciesSortVacancyQuestion extends MainRequestClass
@@ -40,6 +39,9 @@ try {
 }
 
 // Проверка доступа
+require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/check_permission.inc.php';
+require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/manager_check_user.inc.php';
+
 if ($user['type'] != 'Админ' && !checkManagerVacancyPermission($pdo, $out, $user['id'], 'VACANCY_PERMISSION', $in->vacancyId)) {
     $out->make_wrong_resp('Отсутствует доступ к этой вакансии');
 }
@@ -74,26 +76,28 @@ unset($stmt);
 
 // Подготовка запроса для получения вопроса
 $stmt = $pdo->prepare("
-    SELECT `sort`
+    SELECT `vacancy_id`, `sort`
     FROM `vacancy_questions`
-    WHERE `vacancy_id` = :vacancyId
-    AND `id` = :questionId;
+    WHERE `id` = :questionId;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
 
 // Выполнение запроса для получения вопроса
 $stmt->execute([
-    'vacancyId' => $in->vacancyId,
     'questionId' => $in->questionId,
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
 
 // Проверка наличия вопроса
-$stmt->rowCount() != 0 or $out->make_wrong_resp("Вопрос {$in->questionId} у вакансии {$in->vacancyId} не найден");
+$stmt->rowCount() != 0 or $out->make_wrong_resp("Вопрос с ID {$in->questionId} не найден");
 
 /*
  * Словарь, содержащий поле:
- * sort - Значение сортировки
+ * vacancy_id - ID вакансии к которой привязан вопрос
+ * sort       - Значение сортировки
  */
 $question = $stmt->fetch(PDO::FETCH_ASSOC);
+
+$question['vacancy_id'] == $in->vacancyId
+or $out->make_wrong_resp("Вопрос с ID {$in->questionId} не принадлежит к вакансии с ID {$in->vacancyId}");
 
 $stmt->closeCursor();
 unset($stmt);
