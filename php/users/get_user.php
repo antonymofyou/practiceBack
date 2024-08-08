@@ -59,36 +59,25 @@ try {
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
 if (!in_array($user_type, ['Админ'])) $out->make_wrong_resp('Ошибка доступа'); // Доступ только у админа
 
-//Валидация $in->userVkId
+//Получаем данные
 if (((string) (int) $in->userVkId) !== ((string) $in->userVkId) || (int) $in->userVkId <= 0) $out->make_wrong_resp("Параметр 'userVkId' задан неверно или отсутствует");
-    $stmt = $pdo->prepare("
-        SELECT `user_vk_id`
-        FROM `users`
-        WHERE `user_vk_id` = :userVkId;
-    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
-    $stmt->execute([
-        'userVkId' => $in->userVkId
-    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
-    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Пользователь с ВК ID {$in->userVkId} не найден");
-    $stmt->closeCursor(); unset($stmt);
+$stmt = $pdo->prepare("
+    SELECT `user_vk_id`, `user_referer`, `user_ava_link`, `user_name`, `user_surname`, `user_otch`, `user_curator`, `user_curator_dz`, `user_curator_zach`, `user_blocked`, `user_bdate`, `user_tel`, `user_email`, `user_type`, `user_tarif`, `user_tarif_num`, `user_zachet`, `user_payday`, `user_class_number`, `user_start_course_date`, `user_region`
+    FROM `users`
+    WHERE `user_vk_id` = :userVkId;
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса');
+$stmt->execute([
+    'userVkId' => $in->userVkId
+]) or $out->make_wrong_resp('Ошибка базы данных: Выполнение запроса');
+if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Пользователь с ВК ID {$in->userVkId} не найден");
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+$stmt->closeCursor(); unset($stmt);
 
 //Преобразуем промокод в реферальный ID
 //0-B 1-C 2-D 3-E 4-F 5-G 6-H 7-K 8-L 9-M
 $letters = array('B', 'C', 'D', 'E', 'F', 'G', 'H', 'K', 'L', 'M');
 $numbers = array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9');
 $promocode = str_replace($numbers, $letters, $in->userVkId);
-
-//Получаем данные
-$stmt = $pdo->prepare("
-    SELECT `user_vk_id`, `user_referer`, `user_ava_link`, `user_name`, `user_surname`, `user_otch`, `user_curator`, `user_curator_dz`, `user_curator_zach`, `user_blocked`, `user_bdate`, `user_tel`, `user_email`, `user_type`, `user_tarif`, `user_tarif_num`, `user_zachet`, `user_payday`, `user_class_number`, `user_start_course_date`, `user_region`
-    FROM `users`
-    WHERE `user_vk_id` = :userVkId;
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
-$stmt->execute([
-    'userVkId' => $in->userVkId
-]) or $out->make_wrong_resp('Ошибка базы данных: Выполнение запроса (2)');
-$user = $stmt->fetch(PDO::FETCH_ASSOC);
-$stmt->closeCursor(); unset($stmt);
 
 //Формируем ответ
 $out->user = [
