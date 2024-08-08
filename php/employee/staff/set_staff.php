@@ -119,10 +119,10 @@ if($in->action == 'create') //Создаём сотрудника
             SELECT `vk_id`
             FROM `staff`
             WHERE `vk_id` = :vkId;
-        ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (5)');
+            ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
         $stmt->execute([
             'vkId' => $in->set['vkId']
-        ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (5)');
+            ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
         if ($stmt->rowCount() != 0) $out->make_wrong_resp("Ошибка: Сотрудник с ВК ID {$in->set['vkId']} уже существует (1)");
         $stmt->closeCursor(); unset($stmt);
     $set['vkId'] = $in->set['vkId'];
@@ -155,8 +155,8 @@ if($in->action == 'create') //Создаём сотрудника
         INSERT INTO `staff`
         (`id`, `vk_id`, `type`, `first_name`, `last_name`, `middle_name`, `blocked`) 
         VALUES (:staffId, :vkId, :type, :firstName, :lastName, :middleName, :blocked);
-    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
-    $stmt->execute($set) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
+    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (5)');
+    $stmt->execute($set) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (5)');
     $stmt->closeCursor(); unset($stmt);
 
     //Берём ID созданного сотрудника, чтобы вернуть его данные
@@ -170,10 +170,10 @@ if($in->action == 'update'){ //Обновляем данные существу�
         SELECT `id`
         FROM `staff`
         WHERE `id` = :staffId;
-    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (7)');
+    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
     $stmt->execute([
         'staffId' => $in->staffId
-    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (7)');
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
     if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Сотрудник с ID {$in->staffId} не найден (2)");
     $stmt->closeCursor(); unset($stmt);
 
@@ -187,10 +187,10 @@ if($in->action == 'update'){ //Обновляем данные существу�
                 SELECT `id`, `vk_id`
                 FROM `staff`
                 WHERE `vk_id` = :vkId;
-            ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (8)');
+            ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (7)');
             $stmt->execute([
                 'vkId' => $in->set['vkId']
-            ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (8)');
+            ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (7)');
             //Если найден сотрудник с таким же ВК ID и это не этот сотрудник - то выдаём ошибку
             if ($stmt->rowCount() != 0 && $stmt->fetch(PDO::FETCH_ASSOC)['id'] != $in->staffId) $out->make_wrong_resp("Ошибка: Сотрудник с ВК ID {$in->set['vkId']} уже существует (2)");
             $stmt->closeCursor(); unset($stmt);
@@ -245,8 +245,8 @@ if($in->action == 'update'){ //Обновляем данные существу�
         UPDATE `staff` 
         SET $values 
         WHERE `id` = :staffId;
-    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (9)');
-    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (9)');
+    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (8)');
+    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (8)');
     $stmt->closeCursor(); unset($stmt);
 }
 
@@ -256,10 +256,10 @@ $stmt = $pdo->prepare("
     SELECT `id`, `vk_id`, `type`, `first_name`, `last_name`, `middle_name`, `blocked`
     FROM `staff`
     WHERE `id` = :staffId;
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (10)');
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (9)');
 $stmt->execute([
     'staffId' => $in->staffId
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (10)');
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (9)');
 if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
 $info = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
@@ -280,10 +280,10 @@ $stmt = $pdo->prepare("
     SELECT `staff_id`, `field`, `value`, `comment`
     FROM `staff_pers_data`
     WHERE `staff_id` = :staffId;
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (11)');
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (10)');
 $stmt->execute([
     'staffId' => $in->staffId
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (11)');
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (10)');
 //Формируем ответ с личными данными сотрудника
 $fields = [];
 while ($field = $stmt->fetch(PDO::FETCH_ASSOC)) {
