@@ -1,10 +1,10 @@
 <?php // [Менеджер] Сортировка вопросов вакансии
 
-global $user;
 header('Content-Type: application/json; charset=utf-8');
 
 require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/root_classes.inc.php';
+require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/check_permission.inc.php';
 
 // Класс запроса
 class VacanciesSortVacancyQuestion extends MainRequestClass
@@ -39,7 +39,6 @@ try {
 }
 
 // Проверка доступа
-require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/check_permission.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['API_DEV_PATH_HR'] ?? '') . '/app/api/includes/manager_check_user.inc.php';
 
 if ($user['type'] != 'Админ' && !checkManagerVacancyPermission($pdo, $out, $user['id'], 'VACANCY_PERMISSION', $in->vacancyId)) {
@@ -87,7 +86,7 @@ $stmt->execute([
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
 
 // Проверка наличия вопроса
-$stmt->rowCount() != 0 or $out->make_wrong_resp("Вопрос с ID {$in->questionId} не найден");
+if ($stmt->rowCount() == 0) $out->make_wrong_resp("Вопрос с ID {$in->questionId} не найден");
 
 /*
  * Словарь, содержащий поле:
@@ -96,8 +95,7 @@ $stmt->rowCount() != 0 or $out->make_wrong_resp("Вопрос с ID {$in->questi
  */
 $question = $stmt->fetch(PDO::FETCH_ASSOC);
 
-$question['vacancy_id'] == $in->vacancyId
-or $out->make_wrong_resp("Вопрос с ID {$in->questionId} не принадлежит к вакансии с ID {$in->vacancyId}");
+if ($question['vacancy_id'] != $in->vacancyId) $out->make_wrong_resp("Вопрос с ID {$in->questionId} не принадлежит к вакансии с ID {$in->vacancyId}");
 
 $stmt->closeCursor();
 unset($stmt);
