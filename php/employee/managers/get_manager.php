@@ -5,33 +5,31 @@ header('Content-Type: application/json; charset=utf-8');
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
-class EmployeeStaffGetStaff extends MainRequestClass {
-    public $staffId = ''; //Идентификатор сотрудника
+class EmployeeManagersGetManager extends MainRequestClass {
+    public $managerId = ''; //Идентификатор сотрудника
 }
-$in = new EmployeeStaffGetStaff();
+$in = new EmployeeManagersGetManager();
 $in->from_json(file_get_contents('php://input'));
 
-class EmployeeStaffGetStaffResponse extends MainResponseClass {
+class EmployeeManagersGetManagerResponse extends MainResponseClass {
     /* Словарь с данными сотрудника
-        - staffId - Идентификатор сотрудника
-        - vkId - Идентификатор профиля ВК сотрудника
-        - type - Тип сотрудника: Админ или Куратор ?
-        - firstName - Имя сотрудника
-        - lastName - Фамилия сотрудника
-        - middleName - Отчество сотрудника
-        - blocked - Заблокирован ли сотрудник или нет, значение 0 или 1 соотвественно
+        - managerId - Идентификатор сотрудника
+        - userVkId - Идентификатор профиля ВК сотрудника
+        - name - ФИО сотрудника
+        - type - Тип сотрудника: Админ, Менеджер или Сотрудник
+        - createdAt - Дата и время создания записи о сотруднике
     */
     public $info = []; // Словарь с возвращаемыми данными сотрудника
 
     /* Массив словарей со следующими полями:
-        - staffId - Идентификатор соответствующего сотрудника
+        - managerId - Идентификатор соответствующего сотрудника
         - field - Наименование личных данных 
         - value - Значение личных данных, необязательно
         - comment - Комментарий к полю, необязательно
     */
     public $fields = []; // Массив словарей с личными данными
 }
-$out = new EmployeeStaffGetStaffResponse();
+$out = new EmployeeManagersGetManagerResponse();
 
 
 //Подключение к БД
@@ -47,59 +45,57 @@ try {
 
 //Проверка пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
-if (!in_array($user_type, ['Админ', 'Куратор'])) $out->make_wrong_resp('Ошибка доступа');
+if (!in_array($user_type, ['Админ', 'Менеджер'])) $out->make_wrong_resp('Ошибка доступа'); 
 
-//Валидация staffId
-if (((string) (int) $in->staffId) !== ((string) $in->staffId) || (int) $in->staffId <= 0) $out->make_wrong_resp("Параметр 'staffId' задан некорректно или отсутствует");
+//Валидация managerId
+if (((string) (int) $in->managerId) !== ((string) $in->managerId) || (int) $in->managerId <= 0) $out->make_wrong_resp("Параметр 'managerId' задан некорректно или отсутствует");
 $stmt = $pdo->prepare("
     SELECT `id`
-    FROM `staff`
-    WHERE `id` = :staffId;
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
+    FROM `managers`
+    WHERE `id` = :managerId;
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
 $stmt->execute([
-    'staffId' => $in->staffId
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
-if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Сотрудник с ID {$in->staffId} не найден");
+    'managerId' => $in->managerId
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
+if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Сотрудник с ID {$in->managerId} не найден");
 $stmt->closeCursor(); unset($stmt);
 
-//Получаем данные по staffId
+//Получаем данные по managerId
 $stmt = $pdo->prepare("
-    SELECT `id`, `vk_id`, `type`, `first_name`, `last_name`, `middle_name`, `blocked`
-    FROM `staff`
-    WHERE `id` = :staffId;
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (7)');
+    SELECT `id`, `user_vk_id`, `type`, `name`, `created_at`
+    FROM `managers`
+    WHERE `id` = :managerId;
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
 $stmt->execute([
-    'staffId' => $in->staffId
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (7)');
+    'managerId' => $in->managerId
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
 if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
 $info = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
 //Из полученных данных формируем словарь в вывод
 $out->info = [
-    'staffId' => (string) $info['staffId'],
-    'vkId' => (string) $info['vk_id'],
+    'managerId' => (string) $info['managerId'],
+    'userVkId' => (string) $info['user_vk_id'],
+    'name' => (string) $info['name'],
     'type' => (string) $info['type'],
-    'firstName' => (string) $info['first_name'],
-    'lastName' => (string) $info['last_name'],
-    'middleName' => (string) $info['middle_name'],
-    'blocked' => (string) $info['blocked']
+    'createdAt' => (string) $info['created_at']
 ];
 
-//Получаем поля с личными данными по staffId
+//Получаем поля с личными данными по managerId
 $stmt = $pdo->prepare("
-    SELECT `staff_id`, `field`, `value`, `comment`
-    FROM `staff_pers_data`
-    WHERE `staff_id` = :staffId;
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (8)');
+    SELECT `manager_id`, `field`, `value`, `comment`
+    FROM `managers_pers_data`
+    WHERE `manager_id` = :managerId;
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
 $stmt->execute([
-    'staffId' => $in->staffId
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (8)');
+    'managerId' => $in->managerId
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
 //Формируем ответ с личными данными сотрудника
 $fields = [];
 while ($field = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $fields[] = [
-        'staffId' => (string) $field['staff_id'],
+        'managerId' => (string) $field['managers_id'],
         'field' => (string) $field['field'],
         'value' => (string) $field['value'],
         'comment' => (string) $field['comment'],

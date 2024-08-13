@@ -5,14 +5,14 @@ header('Content-Type: application/json; charset=utf-8');
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
-class EmployeeStaffGetVkId extends MainRequestClass {
+class EmployeeManagersGetVkId extends MainRequestClass {
     public $url = ''; //Ссылка на профиль ВК
 }
 
-$in = new EmployeeStaffGetVkId();
+$in = new EmployeeManagersGetVkId();
 $in->from_json(file_get_contents('php://input'));
 
-class EmployeeStaffGetVkIdResponse extends MainResponseClass {
+class EmployeeManagersGetVkIdResponse extends MainResponseClass {
     /* Словарь со следующими полями:
         - vkId - Идентификатор ВК
         - vkName - Имя профиля ВК
@@ -21,7 +21,7 @@ class EmployeeStaffGetVkIdResponse extends MainResponseClass {
     */
     public $vkInfo = []; //Имя, Фамилия, Отчество и Идентификатор ВК
 }
-$out = new EmployeeStaffGetVkIdResponse();
+$out = new EmployeeManagersGetVkIdResponse();
 
 //Подключение к БД
 try {
@@ -36,7 +36,7 @@ try {
 
 //Проверка пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
-if (!in_array($user_type, ['Админ'])) $out->make_wrong_resp('Ошибка доступа'); //Доступ только у админа
+if (!in_array($user_type, ['Админ', 'Менеджер'])) $out->make_wrong_resp('Ошибка доступа');
 
 $screenName = ltrim(parse_url($in->url, PHP_URL_PATH), "/"); //Парсим ссылку, убираем слева лишний / и получаем короткое имя профиля
 

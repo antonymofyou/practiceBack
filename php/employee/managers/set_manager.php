@@ -5,47 +5,42 @@ header('Content-Type: application/json; charset=utf-8');
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
-class EmployeeStaffSetStaff extends MainRequestClass {
-    public $staffId = ''; // Идентификатор сотрудника
+class EmployeeManagersSetManager extends MainRequestClass {
+    public $managerId = ''; // Идентификатор сотрудника
 
     public $action = ''; // Кодовое слово для одного из действий: create - добавление данных сотрудника, update - обновление данных сотрудника или delete - удаление данных сотрудника
 
     /* Словарь со следующими полями:
-        - vkId - Идентификатор ВК сотрудника
-        - type - Тип сотрудника: Админ или Куратор ?
-        - firstName - Имя сотрудника
-        - lastName - Фамилия сотрудника
-        - middleName - Отчество сотрудника
-        - blocked - используется только в update
+        - userVkId - Идентификатор ВК сотрудника
+        - type - Тип сотрудника: Админ, Менеджер или Сотрудник
+        - name - ФИО сотрудника
     */
     public $set = []; //Словарь с данными сотрудника для создания или обновления
 
 }
-$in = new EmployeeStaffSetStaff();
+$in = new EmployeeManagersSetManager();
 $in->from_json(file_get_contents('php://input'));
 
-class EmployeeStaffSetStaffResponse extends MainResponseClass {
+class EmployeeManagersSetManagerResponse extends MainResponseClass {
 
     /* Словарь с данными сотрудника
-        - id - Идентификатор сотрудника
-        - vkId - Идентификатор профиля ВК сотрудника
-        - type - Тип сотрудника: Админ или Куратор ?
-        - firstName - Имя сотрудника
-        - lastName - Фамилия сотрудника
-        - middleName - Отчество сотрудника
-        - blocked - Заблокирован ли сотрудник или нет, значение 0 или 1 соотвественно
+        - managerId - Идентификатор сотрудника
+        - userVkId - Идентификатор профиля ВК сотрудника
+        - name - ФИО сотрудника
+        - type - Тип сотрудника: Админ, Менеджер или Сотрудник
+        - createdAt - Дата и время создания записи о сотруднике
     */
     public $info = []; // Словарь с информацией о сотруднике
 
     /* Массив словарей со следующими полями:
-        - staffId - Идентификатор соответствующего сотрудника
+        - managerId - Идентификатор соответствующего сотрудника
         - field - Наименование личных данных 
         - value - Значение личных данных, необязательно
         - comment - Комментарий к полю, необязательно
     */
     public $fields = []; // Поля с личными данными
 }
-$out = new EmployeeStaffSetStaffResponse();
+$out = new EmployeeManagersSetManagerResponse();
 
 //Подключение к БД
 try {
@@ -67,36 +62,36 @@ if(!in_array($in->action, ['create', 'delete', 'update'])) $out->make_wrong_resp
 
 if($in->action == 'delete') //Удаляем сотрудника
 {
-    //Валидация staffId
-    if (((string) (int) $in->staffId) !== ((string) $in->staffId) || (int) $in->staffId <= 0) $out->make_wrong_resp("Параметр 'staffId' задан некорректно или отсутствует (1)");
+    //Валидация managerId
+    if (((string) (int) $in->managerId) !== ((string) $in->managerId) || (int) $in->managerId <= 0) $out->make_wrong_resp("Параметр 'managerId' задан некорректно или отсутствует (1)");
     $stmt = $pdo->prepare("
         SELECT `id`
-        FROM `staff`
-        WHERE `id` = :staffId;
+        FROM `managers`
+        WHERE `id` = :managerId;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
     $stmt->execute([
-        'staffId' => $in->staffId
+        'managerId' => $in->managerId
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
-    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Сотрудник с ID {$in->staffId} не найден (1)");
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Сотрудник с ID {$in->managerId} не найден (1)");
     $stmt->closeCursor(); unset($stmt);
 
     //Удаляем данные сотрудника по номеру
     $stmt = $pdo->prepare("
-        DELETE FROM `staff`
-        WHERE `id` = :staffId;
+        DELETE FROM `managers`
+        WHERE `id` = :managerId;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
     $stmt->execute([
-        'staffId' => $in->staffId
+        'managerId' => $in->managerId
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
     $stmt->closeCursor(); unset($stmt);
     
     //Удаляем личные данные этого сотрудника
     $stmt = $pdo->prepare("
-        DELETE FROM `staff_pers_data`
-        WHERE `staff_id` = :staffId;
+        DELETE FROM `manager_pers_data`
+        WHERE `manager_id` = :managerId;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
     $stmt->execute([
-        'staffId' => $in->staffId
+        'managerId' => $in->managerId
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
     $stmt->closeCursor(); unset($stmt);
 
@@ -108,123 +103,92 @@ if($in->action == 'create') //Создаём сотрудника
 {
     $set = []; //Словарь с валидированными значениями для создания
 
-    //staffId - Ставим null чтобы ID сам создался в базе
-    $set['staffId'] = null;
+    //managerId - Ставим null чтобы ID сам создался в базе
+    $set['managerId'] = null;
     
     //Валидация $in->set[...], если хоть одно поле не задано - выводим ошибку, кроме blocked
-    //vkId - проверяем, нет ли ещё сотрудников с таким же vkId
-    if (!isset($in->set['vkId'])) $out->make_wrong_resp("Поле 'vkId' не задано");
-    if(!is_string($in->set['vkId'])) $out->make_wrong_resp("Поле 'vkId' задано некорректно (1)");
+    //userVkId - проверяем, нет ли ещё сотрудников с таким же userVkId
+    if (!isset($in->set['userVkId'])) $out->make_wrong_resp("Поле 'userVkId' не задано");
+    if(!is_string($in->set['userVkId'])) $out->make_wrong_resp("Поле 'userVkId' задано некорректно (1)");
         $stmt = $pdo->prepare("
-            SELECT `vk_id`
-            FROM `staff`
-            WHERE `vk_id` = :vkId;
+            SELECT `user_vk_id`
+            FROM `managers`
+            WHERE `user_vk_id` = :userVkId;
             ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
         $stmt->execute([
-            'vkId' => $in->set['vkId']
+            'userVkId' => $in->set['userVkId']
             ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
-        if ($stmt->rowCount() != 0) $out->make_wrong_resp("Ошибка: Сотрудник с ВК ID {$in->set['vkId']} уже существует (1)");
+        if ($stmt->rowCount() != 0) $out->make_wrong_resp("Ошибка: Сотрудник с ВК ID {$in->set['userVkId']} уже существует (1)");
         $stmt->closeCursor(); unset($stmt);
-    $set['vkId'] = $in->set['vkId'];
+    $set['userVkId'] = $in->set['userVkId'];
+
+    //name
+    if (!isset($in->set['name'])) $out->make_wrong_resp("Поле 'name' не задано");
+    if (!is_string($in->set['name']) || mb_strlen($in->set['name']) > 255) $out->make_wrong_resp("Поле 'name' задано некорректно (1)");
+    $set['name'] = $in->set['name'];
 
     //type
     if (!isset($in->set['type'])) $out->make_wrong_resp("Поле 'type' не задано");
-    if (!in_array($in->set['type'], ['Админ', 'Куратор'])) $out->make_wrong_resp("Поле 'type' задано некорректно (1)");
+    if (!in_array($in->set['type'], ['Админ', 'Менеджер', 'Сотрудник'])) $out->make_wrong_resp("Поле 'type' задано некорректно (1)");
     $set['type'] = $in->set['type'];
-
-    //firstName
-    if (!isset($in->set['firstName'])) $out->make_wrong_resp("Поле 'firstName' не задано");
-    if (!is_string($in->set['firstName']) || mb_strlen($in->set['firstName']) > 255) $out->make_wrong_resp("Поле 'firstName' задано некорректно (1)");
-    $set['firstName'] = $in->set['firstName'];
-
-    //lastName
-    if (!isset($in->set['lastName'])) $out->make_wrong_resp("Поле 'lastName' не задано");
-    if (!is_string($in->set['lastName']) || mb_strlen($in->set['lastName']) > 255) $out->make_wrong_resp("Поле 'lastName' задано некорректно (1)");
-    $set['lastName'] = $in->set['lastName'];
-
-    //middleName
-    if (!isset($in->set['middleName'])) $out->make_wrong_resp("Поле 'middleName' не задано");
-    if (!is_string($in->set['middleName']) || mb_strlen($in->set['middleName']) > 255) $out->make_wrong_resp("Поле 'middleName' задано некорректно (1)");
-    $set['middleName'] = $in->set['middleName'];
-
-    //blocked - Пользователь создаётся незаблокированным
-    $set['blocked'] = 0;
 
     //Проводим запрос о добавлении данных сотрудника
     $stmt = $pdo->prepare("
-        INSERT INTO `staff`
-        (`id`, `vk_id`, `type`, `first_name`, `last_name`, `middle_name`, `blocked`) 
-        VALUES (:staffId, :vkId, :type, :firstName, :lastName, :middleName, :blocked);
+        INSERT INTO `managers`
+        (`id`, `user_vk_id`, `name`, `type`) 
+        VALUES (:managerId, :userVkId, :name, :type);
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (5)');
     $stmt->execute($set) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (5)');
     $stmt->closeCursor(); unset($stmt);
 
     //Берём ID созданного сотрудника, чтобы вернуть его данные
-    $in->staffId = $pdo->lastInsertId(); if(!$in->staffId) $out->make_wrong_resp('Произошла ошибка при добавлении сотрудника'); 
+    $in->managerId = $pdo->lastInsertId(); if(!$in->managerId) $out->make_wrong_resp('Произошла ошибка при добавлении сотрудника'); 
 }
 
 if($in->action == 'update'){ //Обновляем данные существующего сотрудника
-    //Валидация staffId
-    if (((string) (int) $in->staffId) !== ((string) $in->staffId) || (int) $in->staffId <= 0) $out->make_wrong_resp("Параметр 'staffId' задан некорректно или отсутствует (2)");
+    //Валидация managerId
+    if (((string) (int) $in->managerId) !== ((string) $in->managerId) || (int) $in->managerId <= 0) $out->make_wrong_resp("Параметр 'managerId' задан некорректно или отсутствует (2)");
     $stmt = $pdo->prepare("
         SELECT `id`
-        FROM `staff`
-        WHERE `id` = :staffId;
+        FROM `managers`
+        WHERE `id` = :managerId;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
     $stmt->execute([
-        'staffId' => $in->staffId
+        'managerId' => $in->managerId
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
-    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Сотрудник с ID {$in->staffId} не найден (2)");
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Сотрудник с ID {$in->managerId} не найден (2)");
     $stmt->closeCursor(); unset($stmt);
 
     $set = []; //Словарь с валидированными изменениями
 
     //Валидация $in->set[...], незаданные поля пропускаем
-    //vkId - также проверяем, чтобы не был задан ВК ИД другого сотрудника
-    if (isset($in->set['vkId'])) {
-        if(!is_string($in->set['vkId'])) $out->make_wrong_resp("Поле 'vkId' задано некорректно");
+    //userVkId - также проверяем, чтобы не был задан ВК ИД другого сотрудника
+    if (isset($in->set['userVkId'])) {
+        if(!is_string($in->set['userVkId'])) $out->make_wrong_resp("Поле 'userVkId' задано некорректно");
         $stmt = $pdo->prepare("
-                SELECT `id`, `vk_id`
-                FROM `staff`
-                WHERE `vk_id` = :vkId;
+                SELECT `id`, `user_vk_id`
+                FROM `managers`
+                WHERE `user_vk_id` = :userVkId;
             ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (7)');
             $stmt->execute([
-                'vkId' => $in->set['vkId']
+                'userVkId' => $in->set['userVkId']
             ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (7)');
             //Если найден сотрудник с таким же ВК ID и это не этот сотрудник - то выдаём ошибку
-            if ($stmt->rowCount() != 0 && $stmt->fetch(PDO::FETCH_ASSOC)['id'] != $in->staffId) $out->make_wrong_resp("Ошибка: Сотрудник с ВК ID {$in->set['vkId']} уже существует (2)");
+            if ($stmt->rowCount() != 0 && $stmt->fetch(PDO::FETCH_ASSOC)['id'] != $in->managerId) $out->make_wrong_resp("Ошибка: Сотрудник с ВК ID {$in->set['userVkId']} уже существует (2)");
             $stmt->closeCursor(); unset($stmt);
-        $set['vk_id'] = $in->set['vkId'];
+        $set['user_vk_id'] = $in->set['userVkId'];
+    }
+
+    //name
+    if (isset($in->set['name'])) {
+        if (!is_string($in->set['name']) || mb_strlen($in->set['name']) > 255) $out->make_wrong_resp("Поле 'name' задано некорректно (2)");
+        $set['name'] = $in->set['name'];
     }
 
     //type
     if (isset($in->set['type'])) {
-        if (!in_array($in->set['type'], ['Админ', 'Куратор'])) $out->make_wrong_resp("Поле 'type' задано некорректно (2)");
+        if (!in_array($in->set['type'], ['Админ', 'Менеджер', 'Сотрудник'])) $out->make_wrong_resp("Поле 'type' задано некорректно (2)");
         $set['type'] = $in->set['type'];
-    }
-
-    //firstName
-    if (isset($in->set['firstName'])) {
-        if (!is_string($in->set['firstName']) || mb_strlen($in->set['firstName']) > 255) $out->make_wrong_resp("Поле 'firstName' задано некорректно (2)");
-        $set['first_name'] = $in->set['firstName'];
-    }
-
-    //lastName
-    if (isset($in->set['lastName'])) {
-        if (!is_string($in->set['lastName']) || mb_strlen($in->set['lastName']) > 255) $out->make_wrong_resp("Поле 'lastName' задано некорректно (2)");
-        $set['last_name'] = $in->set['lastName'];
-    }
-
-    //middleName
-    if (isset($in->set['middleName'])) {
-        if (!is_string($in->set['middleName']) || mb_strlen($in->set['middleName']) > 255) $out->make_wrong_resp("Поле 'middleName' задано некорректно (2)");
-        $set['middle_name'] = $in->set['middleName'];
-    }
-
-    //blocked
-    if (isset($in->set['blocked'])) {
-        if(!in_array($in->set['blocked'], [0, 1])) $out->make_wrong_resp("Поле 'blocked' задано некорректно");
-        $set['blocked'] = $in->set['blocked'];
     }
 
     // если ничего обновлять не нужно - то выводим ошибку
@@ -239,12 +203,12 @@ if($in->action == 'update'){ //Обновляем данные существу�
         $params[$key] = $value;
     }
     $values = join(', ', $values);
-    $params['staffId'] = $in->staffId;
+    $params['managerId'] = $in->managerId;
 
     $stmt = $pdo->prepare("
-        UPDATE `staff` 
+        UPDATE `managers` 
         SET $values 
-        WHERE `id` = :staffId;
+        WHERE `id` = :managerId;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (8)');
     $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (8)');
     $stmt->closeCursor(); unset($stmt);
@@ -253,12 +217,12 @@ if($in->action == 'update'){ //Обновляем данные существу�
 
 //Получаем данные о сотруднике, который был создан или обновлён
 $stmt = $pdo->prepare("
-    SELECT `id`, `vk_id`, `type`, `first_name`, `last_name`, `middle_name`, `blocked`
-    FROM `staff`
-    WHERE `id` = :staffId;
+    SELECT `id`, `user_vk_id`, `name`, `type`
+    FROM `managers`
+    WHERE `id` = :managerId;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (9)');
 $stmt->execute([
-    'staffId' => $in->staffId
+    'managerId' => $in->managerId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (9)');
 if($stmt->rowCount() == 0) $out->make_wrong_resp('Ошибка: данные не получены');
 $info = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -266,29 +230,26 @@ $stmt->closeCursor(); unset($stmt);
 
 //Из полученных данных формируем словарь в вывод
 $out->info = [
-    'staffId' => (string) $info['id'],
-    'vkId' => (string) $info['vk_id'],
-    'type' => (string) $info['type'],
-    'firstName' => (string) $info['first_name'],
-    'lastName' => (string) $info['last_name'],
-    'middleName' => (string) $info['middle_name'],
-    'blocked' => (string) $info['blocked']
+    'managerId' => (string) $info['id'],
+    'userVkId' => (string) $info['user_vk_id'],
+    'name' => (string) $info['name'],
+    'type' => (string) $info['type']
 ];
 
-//Получаем поля с личными данными по staffId
+//Получаем поля с личными данными по managerId
 $stmt = $pdo->prepare("
-    SELECT `staff_id`, `field`, `value`, `comment`
-    FROM `staff_pers_data`
-    WHERE `staff_id` = :staffId;
+    SELECT `manager_id`, `field`, `value`, `comment`
+    FROM `manager_pers_data`
+    WHERE `manager_id` = :managerId;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (10)');
 $stmt->execute([
-    'staffId' => $in->staffId
+    'managerId' => $in->managerId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (10)');
 //Формируем ответ с личными данными сотрудника
 $fields = [];
 while ($field = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $fields[] = [
-        'staffId' => (string) $field['staff_id'],
+        'managerId' => (string) $field['manager_id'],
         'field' => (string) $field['field'],
         'value' => (string) $field['value'],
         'comment' => (string) $field['comment'],
