@@ -75,7 +75,7 @@ $stmt->closeCursor(); unset($stmt);
 
 //Из полученных данных формируем словарь в вывод
 $out->info = [
-    'managerId' => (string) $info['managerId'],
+    'managerId' => (string) $info['id'],
     'userVkId' => (string) $info['user_vk_id'],
     'name' => (string) $info['name'],
     'type' => (string) $info['type'],
@@ -85,7 +85,7 @@ $out->info = [
 //Получаем поля с личными данными по managerId
 $stmt = $pdo->prepare("
     SELECT `manager_id`, `field`, `value`, `comment`
-    FROM `managers_pers_data`
+    FROM `manager_pers_data`
     WHERE `manager_id` = :managerId;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
 $stmt->execute([
