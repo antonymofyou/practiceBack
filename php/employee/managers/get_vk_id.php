@@ -36,7 +36,7 @@ try {
 
 //Проверка пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
-if (!in_array($user_type, ['Админ', 'Менеджер'])) $out->make_wrong_resp('Ошибка доступа');
+if (!in_array($user_type, ['Админ'])) $out->make_wrong_resp('Ошибка доступа');
 
 $screenName = ltrim(parse_url($in->url, PHP_URL_PATH), "/"); //Парсим ссылку, убираем слева лишний / и получаем короткое имя профиля
 
