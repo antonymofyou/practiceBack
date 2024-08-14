@@ -5,13 +5,13 @@ header('Content-Type: application/json; charset=utf-8');
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
-class EmployeeManagersGetManager extends MainRequestClass {
+class ManagersGetManager extends MainRequestClass {
     public $managerId = ''; //Идентификатор сотрудника
 }
-$in = new EmployeeManagersGetManager();
+$in = new ManagersGetManager();
 $in->from_json(file_get_contents('php://input'));
 
-class EmployeeManagersGetManagerResponse extends MainResponseClass {
+class ManagersGetManagerResponse extends MainResponseClass {
     /* Словарь с данными сотрудника
         - managerId - Идентификатор сотрудника
         - userVkId - Идентификатор профиля ВК сотрудника
@@ -29,7 +29,7 @@ class EmployeeManagersGetManagerResponse extends MainResponseClass {
     */
     public $fields = []; // Массив словарей с личными данными
 }
-$out = new EmployeeManagersGetManagerResponse();
+$out = new ManagersGetManagerResponse();
 
 
 //Подключение к БД
@@ -45,7 +45,7 @@ try {
 
 //Проверка пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
-if (!in_array($user_type, ['Админ', 'Менеджер'])) $out->make_wrong_resp('Ошибка доступа'); 
+if (!in_array($user_type, ['Админ'])) $out->make_wrong_resp('Ошибка доступа'); 
 
 //Валидация managerId
 if (((string) (int) $in->managerId) !== ((string) $in->managerId) || (int) $in->managerId <= 0) $out->make_wrong_resp("Параметр 'managerId' задан некорректно или отсутствует");

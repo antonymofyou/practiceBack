@@ -5,14 +5,14 @@ header('Content-Type: application/json; charset=utf-8');
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
-class EmployeeManagersGetVkId extends MainRequestClass {
+class ManagersGetVkId extends MainRequestClass {
     public $url = ''; //Ссылка на профиль ВК
 }
 
-$in = new EmployeeManagersGetVkId();
+$in = new ManagersGetVkId();
 $in->from_json(file_get_contents('php://input'));
 
-class EmployeeManagersGetVkIdResponse extends MainResponseClass {
+class ManagersGetVkIdResponse extends MainResponseClass {
     /* Словарь со следующими полями:
         - vkId - Идентификатор ВК
         - vkName - Имя профиля ВК
@@ -21,7 +21,7 @@ class EmployeeManagersGetVkIdResponse extends MainResponseClass {
     */
     public $vkInfo = []; //Имя, Фамилия, Отчество и Идентификатор ВК
 }
-$out = new EmployeeManagersGetVkIdResponse();
+$out = new ManagersGetVkIdResponse();
 
 //Подключение к БД
 try {
