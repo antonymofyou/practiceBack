@@ -40,21 +40,23 @@ try {
 
 //Проверка пользователя: Если передан id, то проверяем на админа, иначе считаем id авторизованного пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
-if(empty($in->managerId)) {
+if(!empty($in->managerId)) {
     if (!in_array($user_type, ['Админ'])) $out->make_wrong_resp('Ошибка доступа');
-} else $in->managerId = $user_id;
+} else $in->managerId = $user['id'];
 
 //Проводим запрос на получение данных для вывода
 if (((string) (int) $in->managerId) !== ((string) $in->managerId) || (int) $in->managerId <= 0) $out->make_wrong_resp("Параметр 'managerId' задан неверно");
+if (!is_string($in->forDate) || empty($in->forDate)) $out->make_wrong_resp("Параметр 'forDate' задан неверно или отсутствует");
 $stmt = $pdo->prepare("
     SELECT `id`, `manager_id`, `for_date`, `work_time`, `report`, `createdAt`, `updatedAt`
     FROM `managers_job_reports`
-    WHERE `id` = :managerId
+    WHERE `id` = :managerId, `for_date` = :forDate
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса');
 $stmt->execute([
-    'managerId' => $in->managerId
+    'managerId' => $in->managerId,
+    'forDate' => $in->forDate
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса');
-if($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Сотрудник с ID {$in->managerId} не найден");
+if($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Не найдены данные сотрудника за $in->forDate");
 $report = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
