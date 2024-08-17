@@ -15,7 +15,7 @@ $in->from_json(file_get_contents('php://input'));
 
 class JobReportsGetReportResponse extends MainResponseClass {
     /* Словарь со следующими полями:
-    - id          - Идентификатор отчёта
+    - reportId    - Идентификатор отчёта
     - managerId   - Идентификатор сотрудника, которому принадлежит отчёт
     - forDate     - Дата, за которую написан отчёт
     - workTime    - Всего отработано времени за день отчёта
@@ -62,7 +62,7 @@ $stmt->closeCursor(); unset($stmt);
 
 //Формируем ответ
 $out->report = [
-    'id' => (string) $report['id'],
+    'reportId' => (string) $report['id'],
     'managerId' => (string) $report['manager_id'],
     'forDate' => (string) $report['for_date'],
     'workTime' => (string) $report['work_time'],
