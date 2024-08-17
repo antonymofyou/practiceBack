@@ -48,15 +48,15 @@ if(!empty($in->managerId)) {
 if (((string) (int) $in->managerId) !== ((string) $in->managerId) || (int) $in->managerId <= 0) $out->make_wrong_resp("Параметр 'managerId' задан неверно");
 if (!is_string($in->forDate) || empty($in->forDate)) $out->make_wrong_resp("Параметр 'forDate' задан неверно или отсутствует");
 $stmt = $pdo->prepare("
-    SELECT `id`, `manager_id`, `for_date`, `work_time`, `report`, `createdAt`, `updatedAt`
+    SELECT `id`, `manager_id`, `for_date`, `work_time`, `report`, `created_at`, `updated_at`
     FROM `managers_job_reports`
-    WHERE `id` = :managerId, `for_date` = :forDate
+    WHERE `manager_id` = :managerId AND `for_date` = :forDate;
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса');
 $stmt->execute([
     'managerId' => $in->managerId,
     'forDate' => $in->forDate
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса');
-if($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Не найдены данные сотрудника за $in->forDate");
+if($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Не найден отчёт за $in->forDate");
 $report = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
