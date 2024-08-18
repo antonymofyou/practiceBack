@@ -112,6 +112,7 @@ $nowTime = date_create(null, new DateTimeZone("Europe/Moscow"))->format('H:i:s')
 
 //--------------------------------Заполнение dataByPeriods
 $managerShedule = [];
+var_dump($in);
 if (empty($in->managersId)) { //Если входной массив пустой, то получаем график текущего пользователя
     //получение периодов
     $queryPeriods = "SELECT `managers_job_periods`.`id`, `managers_job_periods`.`manager_id`, `managers_job_periods`.`for_date`, `managers_job_periods`.`period_start`, `managers_job_periods`.`period_end`
@@ -125,8 +126,8 @@ if (empty($in->managersId)) { //Если входной массив пусто�
 		'filter_end_date' => $filterEndDate,
 	];
 
-    $stmt = $pdo->prepare($query) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
-    $stmt->execute($params) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (4)');
+    $stmt = $pdo->prepare($queryPeriods) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
+    $stmt->execute($paramsPeriods) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
     while($data = $stmt->fetch(PDO::FETCH_ASSOC)) {
         if($data['for_date'] == $nowDate) $isOnline = '1';
         $managerShedule[$user['id']]['dataByPeriods'][] = $data;
@@ -144,8 +145,8 @@ elseif(array_search('0', $in->managersId)){ //Если входной масси
 		'filter_end_date' => $filterEndDate,
     ];
 
-    $stmt = $pdo->prepare($query) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
-    $stmt->execute($params) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (6)');
+    $stmt = $pdo->prepare($queryPeriods) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
+    $stmt->execute($paramsPeriods) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (6)');
     while($data = $stmt->fetch(PDO::FETCH_ASSOC)) $managerShedule[$data['manager_id']]['dataByPeriods'][] = $data;
     $stmt->closeCursor(); unset($stmt);
 }
@@ -163,21 +164,14 @@ else{ //Если входной массив не имеет 0 и не пуст�
             'filter_start_date' => $filterStartDate,
             'filter_end_date' => $filterEndDate,
         ];
-        $stmt = $pdo->prepare($query) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (7)');
-        $stmt->execute($params) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (7)');
+        $stmt = $pdo->prepare($queryPeriods) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (7)');
+        $stmt->execute($paramsPeriods) or $out->make_wrong_reps('Ошибка базы данных: выполнение запроса (7)');
         while($data = $stmt->fetch(PDO::FETCH_ASSOC)) $managerShedule[$id]['dataByPeriods'][] = $data;
         $stmt->closeCursor(); unset($stmt);
-    }
-
-    
+    }   
 }
-$stmt->closeCursor(); unset($stmt);
 
 //--------------------------------Заполнение dataByDate
-/*  - dataByDate - Массив словарей, где каждый словарь имеет следующие поля:
-     *       - workTimeSum - общее время работы за дату
-     *       - haveReport - есть ли отчет за дату
-     */
 $stmt = $pdo->prepare("SELECT `managers_job_reports`.`work_time`
 		FROM `managers_job_reports` 
 		WHERE `managers_job_reports`.`manager_id`= :manager_id
@@ -186,14 +180,20 @@ $stmt = $pdo->prepare("SELECT `managers_job_reports`.`work_time`
 
 $datesByManager = [];
 foreach($managerShedule as $manager){
-    foreach($manager['dataByPeriods'] as $data) if(!in_array($data['for_date'], $datesByManager)) $datesByManager[$manager] = $data['for_date'];
+    foreach($manager['dataByPeriods'] as $data) if(!in_array($data['for_date'], $datesByManager)) $datesByManager[$data['manager_id']] = $data['for_date'];
 }
 foreach($datesByManager as $id => $date){
     $stmt->execute([
-        'id' => $id,
+        'manager_id' => $id,
         'for_date' => $date
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (8)');
-    while($data = $stmt->fetch(PDO::FETCH_ASSOC))$managersInfo[$user['id']]['isOnline'] = '1';
+    if($stmt->rowCount() == 0) {
+        $managerShedule[$id]['dataByDate'][$date] = ['0', '0'];
+    }
+    else{
+        $data = $stmt->fetch(PDO::FETCH_ASSOC);
+        $managerShedule[$id]['dataByDate'][$date] = [$data['work_time'], '1'];
+    }
     $stmt->closeCursor(); unset($stmt);
 }
 
@@ -207,9 +207,12 @@ $stmt = $pdo->prepare("SELECT `managers_job_periods`.`id`, `managers_job_periods
         ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (9)');
 foreach(array_keys($managerShedule) as $id){
     $stmt->execute([
-        'id' => $id
+        'manager_id' => $id,
+        'now_date' => $nowDate,
+        'now_time' => $nowTime,
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (9)');
     if ($stmt->rowCount() > 0) $managersInfo[$user['id']]['isOnline'] = '1';
+    else $managersInfo[$user['id']]['isOnline'] = '0';
     $stmt->closeCursor(); unset($stmt);
 }
 //--------------------------------Формирование ответа
