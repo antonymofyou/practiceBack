@@ -41,7 +41,7 @@ try {
 //Проверка пользователя: Если передан id, то проверяем на админа, иначе считаем id авторизованного пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
 if(!empty($in->managerId)) {
-    if (!in_array($user_type, ['Админ'])) $out->make_wrong_resp('Ошибка доступа');
+    if (!in_array($user['type'], ['Админ'])) $out->make_wrong_resp('Ошибка доступа');
 } else $in->managerId = $user['id'];
 
 //Проводим запрос на получение данных для вывода

@@ -1,6 +1,7 @@
-<?php //Получаем данные отчёта
+<?php //Создаём, обновляем и удаляем отчёты
 
 header('Content-Type: application/json; charset=utf-8');
+date_default_timezone_set('UTC'); // Устанавливаем нулевой часовой пояс для верности рассчётов с функцией date() для отработанного времени
 
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
@@ -8,7 +9,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 class JobReportsGetReport extends MainRequestClass {
     public $reportId = ''; //Идентификатор отчёта для удаления или обновления
     public $managerId = ''; //Идентификатор сотрудника, отчёт которого надо создать, при пустом поле принимается id текущего пользователя
-    public $forDate = ''; //Дата, за которую нужно создать отчёт, обязательно
+    public $forDate = ''; //Дата, за которую нужно создать отчёт
     public $report = ''; //Отчёт, необязательно
     public $action = ''; //Тип действия: create - создать отчёт, delete - удалить отчёт, update - обновить отчёт
 }
@@ -49,14 +50,14 @@ if(!empty($in->managerId)) {
 
 
 //Валидация действия
-if(!in_array($action, ['create', 'delete', 'update'])) $out->make_wrong_resp('Неверное действие');
+if(!in_array($in->action, ['create', 'delete', 'update'])) $out->make_wrong_resp('Неверное действие');
 
-if($action == 'delete') { //Удаляем отчёт
+if($in->action == "delete") { //Удаляем отчёт
     
-    //Валидируем reportId
+    //Валидируем reportId и проверяем возможность удаления
     if (((string) (int) $in->reportId) !== ((string) $in->reportId) || (int) $in->reportId <= 0) $out->make_wrong_resp("Параметр 'reportId' задан неверно");
     $stmt = $pdo->prepare("
-    SELECT `id`
+    SELECT `id`, `manager_id`, `created_at`
     FROM `managers_job_reports`
     WHERE `id` = :reportId;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
@@ -64,7 +65,10 @@ if($action == 'delete') { //Удаляем отчёт
         'reportId' => $in->reportId
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
     if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Отчёт не найден");
+    $data = $stmt->fetch(PDO::FETCH_ASSOC);
         $stmt->closeCursor(); unset($stmt);
+
+    if ($data['manager_id'] == $user['id'] && (int) date_diff(date_create(), date_create($data['created_at']))->format('%r%a') <= -2) $out->make_wrong_resp('Нельзя удалять отчёт, если прошло более двух дней');
 
     //Удаляем отчёт
     $stmt = $pdo->prepare("
@@ -80,7 +84,7 @@ if($action == 'delete') { //Удаляем отчёт
     $out->make_resp('');
 }
 
-if($action == 'create') { //Создаём отчёт
+if($in->action == 'create') { //Создаём отчёт
 
     //Валидируем managerId
     if (((string) (int) $in->managerId) !== ((string) $in->managerId) || (int) $in->managerId <= 0) $out->make_wrong_resp("Параметр 'managerId' задан неверно");
@@ -98,6 +102,8 @@ if($action == 'create') { //Создаём отчёт
     //Валидируем forDate
     if (!isset($in->forDate)) $out->make_wrong_resp("Поле 'forDate' не задано");
     if (!is_string($in->forDate) || empty($in->forDate)) $out->make_wrong_resp("Параметр 'forDate' задан неверно");
+    //Нельзя создать отчёт за день, который ещё не наступил
+    if ((int) date_diff(date_create(date('Y-m-d')), date_create($in->forDate))->format('%r%a') > 0) $out->make_wrong_resp('Нельзя создать отчёт за день, который ещё не наступил');
 
     //Проверяем, существует ли уже отчёт с переданным id сотрудника и датой
     $stmt = $pdo->prepare("
@@ -116,32 +122,31 @@ if($action == 'create') { //Создаём отчёт
     $stmt = $pdo->prepare("
     SELECT `period_start` AS `start`, `period_end` as `end`
     FROM `managers_job_periods`
-    WHERE manager_id = :managerId AND for_date = :forDate;
+    WHERE `manager_id` = :managerId AND `for_date` = :forDate;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
     $stmt->execute([
         'managerId' => $in->managerId,
         'forDate' => $in->forDate
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
-
     //Получаем разницу между началом и концом периода
-    $times = []; //Массив с разницами
-    while ($period = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $start = date_create($period['start']) or $out->make_wrong_resp('Ошибка: получено неверное начало периода');
-        $end = date_create($period['end']) or $out->make_wrong_resp('Ошибка: получен неверный конец периода');
-        $times[] = (int) date_diff($start, $end)->format('%f'); //Форматируем в микросекунды для упрощения счёта
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Отсутствуют рабочие периоды за эту дату");
+    $diffs = []; //Массив с разницами
+    while ($diff = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $diffs[] = strtotime($diff["end"]) - strtotime($diff["start"]); //сравниваем время в unix timestamp
     }
+    $stmt->closeCursor(); unset($stmt);
 
-    $workTime = date('H:i', array_sum($times)); //Общее отработанное время за день
+    $workTime = date('H:i', array_sum($diffs)); //Общее отработанное время за день в формате часы:минуты
 
     //Валидируем report
     if(isset($in->report)) {
         if (!is_string($in->report)) $out->make_wrong_resp("Параметр 'report' задан неверно");
-    } else $in->report = ''; //Если отчёт не передали, то задаём его как пустой
+    } else $in->report = null; //Если отчёт не передали, то задаём его как null
 
     //Вставляем данные в БД
     $stmt = $pdo->prepare("
     INSERT INTO `managers_job_reports`
-    (`id`, `manager_id`, `for_date`, `workTime`, `report`)
+    (`id`, `manager_id`, `for_date`, `work_time`, `report`)
     VALUES (null, :managerId, :forDate, :workTime, :report);
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (7)');
     $stmt->execute([
@@ -152,18 +157,83 @@ if($action == 'create') { //Создаём отчёт
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (7)');
 
     //Берём ID созданного отчёта, чтобы вернуть его данные
-    $in->reportId = $pdo->lastInsertId(); if(!$in->reportId) $out->make_wrong_resp('Произошла ошибка при добавлении отчёта'); 
+    $in->reportId = $pdo->lastInsertId('id'); if(!$in->reportId) $out->make_wrong_resp('Произошла ошибка при добавлении отчёта'); 
+} 
+
+if ($in->action == 'update') { //Обновляём отчёт
+    $set = []; //Массив для валидированных значений
+
+    //Валидируем reportId
+    if (((string) (int) $in->reportId) !== ((string) $in->reportId) || (int) $in->reportId <= 0) $out->make_wrong_resp("Параметр 'reportId' задан неверно");
+    $stmt = $pdo->prepare("
+    SELECT `id`, `manager_id`, `for_date`, `created_at`
+    FROM `managers_job_reports`
+    WHERE `id` = :reportId;
+    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (8)');
+    $stmt->execute([
+        'reportId' => $in->reportId
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (8)');
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Отчёт не найден");
+    $data = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt->closeCursor(); unset($stmt);
+
+    //Сравниваем текущую дату с датой создания отчёта
+    if ($data['manager_id'] == $user['id'] && (int) date_diff(date_create(), date_create($data['created_at']))->format('%r%a') <= -2) $out->make_wrong_resp('Нельзя обновить отчёт, если прошло более двух дней');
+
+    //Высчитываем workTime, сначала запрашиваем начало и конец периодов за день
+    $stmt = $pdo->prepare("
+    SELECT `period_start` AS `start`, `period_end` as `end`
+    FROM `managers_job_periods`
+    WHERE `manager_id` = :managerId AND `for_date` = :forDate;
+    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (9)');
+    $stmt->execute([
+        'managerId' => $data['manager_id'],
+        'forDate' => $data['for_date']
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (9)');
+    //Получаем разницу между началом и концом периода
+    $diffs = []; //Массив с разницами
+    while ($diff = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $diffs[] = strtotime($diff["end"]) - strtotime($diff["start"]); //сравниваем время в unix timestamp
+    }
+    $stmt->closeCursor(); unset($stmt);
+    
+    $workTime = date('H:i', array_sum($diffs)); //Общее отработанное время за день в формате часы:минуты
+    $set['work_time'] = $workTime;
+
+    //Валидируем report, если не задали, то пропускаем
+    if(isset($in->report)) {
+        if (!is_string($in->report)) $out->make_wrong_resp("Параметр 'report' задан неверно");
+        $set['report'] = $in->report;
+    }
+    
+    //Формируем запрос на обновление данных сотрудника и проводим его
+    $values = [];
+    $params = [];
+    foreach ($set as $key => $value) { 
+        $values[] = "`$key` = :$key";
+        $params[$key] = $value;
+    }
+    $values = join(', ', $values);
+    $params['reportId'] = $in->reportId;
+
+    $stmt = $pdo->prepare("
+        UPDATE `managers_job_reports` 
+        SET $values 
+        WHERE `id` = :reportId;
+    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (10)');
+    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (10)');
+    $stmt->closeCursor(); unset($stmt);
 } 
 
 //Получаем данные созданного/обновлённого отчёта в возврат
 $stmt = $pdo->prepare("
     SELECT `id`, `manager_id`, `for_date`, `work_time`, `report`, `created_at`, `updated_at`
     FROM `managers_job_reports`
-    WHERE `id` = :reportId
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса');
+    WHERE `id` = :reportId;
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (11)');
 $stmt->execute([
     'reportId' => $in->reportId
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса');
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (11)');
 if($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Не найден отчёт с ID $in->reportId");
 $report = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
