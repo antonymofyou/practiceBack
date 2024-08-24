@@ -1,4 +1,4 @@
-<?php //Получаем данные отчёта
+<?php //---Получение отчёта
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -27,7 +27,7 @@ class JobReportsGetReportResponse extends MainResponseClass {
 }
 $out = new JobReportsGetReportResponse();
 
-//Подключение к БД
+//---Подключение к БД
 try {
     $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_DATABASE_SOCEGE . ";charset=" . DB_CHARSET, DB_USER, DB_PASSWORD, DB_SSL_FLAG === MYSQLI_CLIENT_SSL ? [
         PDO::MYSQL_ATTR_SSL_CA => DB_SSL_CA,
@@ -38,13 +38,13 @@ try {
     $out->make_wrong_resp('Нет соединения с базой данных');
 }
 
-//Проверка пользователя: Если передан id, то проверяем на админа, иначе считаем id авторизованного пользователя
-require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
+//---Проверка пользователя: Если передан id, то проверяем на админа, иначе считаем id авторизованного пользователя
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/manager_check_user.inc.php';
 if(!empty($in->managerId)) {
     if (!in_array($user['type'], ['Админ'])) $out->make_wrong_resp('Ошибка доступа');
 } else $in->managerId = $user['id'];
 
-//Проводим запрос на получение данных для вывода
+//---Запрос на получение данных для вывода
 if (((string) (int) $in->managerId) !== ((string) $in->managerId) || (int) $in->managerId <= 0) $out->make_wrong_resp("Параметр 'managerId' задан неверно");
 if (!is_string($in->forDate) || empty($in->forDate)) $out->make_wrong_resp("Параметр 'forDate' задан неверно или отсутствует");
 $stmt = $pdo->prepare("
@@ -60,7 +60,7 @@ if($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Не найде�
 $report = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
-//Формируем ответ
+//---Формирование ответа
 $out->report = [
     'reportId' => (string) $report['id'],
     'managerId' => (string) $report['manager_id'],
