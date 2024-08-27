@@ -8,43 +8,59 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 // класс запроса
 class JobGetShedule extends MainRequestClass {
-	public $managerId = ''; // ID менеджера, по которому нужно вывести расписание, 
-                            //при пустом значении выводится расписание текущего пользователя
-	public $filterStartDate = ''; // Дата начала за какой период нужно вывести расписание в формате yyyy-mm-dd
-	public $filterEndDate = ''; // Дата конца за какой период нужно вывести расписание в формате yyyy-mm-dd
-	
+    public $staffId = ''; // ID менеджера, по которому нужно вывести расписание, 
+    //при пустом значении выводится расписание текущего пользователя
+    public $filterStartDate = ''; // Дата начала за какой период нужно вывести расписание включительно в формате yyyy-mm-dd 
+    public $filterEndDate = ''; // Дата конца за какой период нужно вывести расписание включительно в формате yyyy-mm-dd
+
 }
 $in = new JobGetShedule();
 $in->from_json(file_get_contents('php://input'));
-
+$in->from_json('{
+    "device": "",
+    "staffId": "1",
+    "filterStartDate": "2024-08-20",
+    "filterEndDate": "2024-08-29",
+    "signature": "aaasdasss"
+ }');
+ $user = [
+    'id' => '1',
+    'type' => 'Админ',
+ ];
 // класс ответа
-class JobGetSheduleResponse extends MainResponseClass {
-	/*
-     * Массив словарей, где каждый словарь имеет имеет следующие поля:
-     *  - managerId - идентификатор менеджера
-     *  - forDate - на какую дату приходятся периоды в формате yyyy-mm-dd
+class JobGetScheduleResponse extends MainResponseClass {
+    /*
+     * Массив словарей, где каждый словарь содержит следующие поля:
+     *  - dayId - id дня
+     *  - date - дата дня в формате yyyy-mm-dd
+     *  - workTime - сколько времени потратил за день (пользователь заполняет самостоятельно)
+     *  - report - текст отчета за дату (может быть пустой строкой, если отчет отсутствует)
+     *  - reportId - id отчёта (может быть пустой строкой, если отчёт отсутствует)
+     *  - isWeekend - является ли этот день выходным (0/1)
+     *  - comment - комментарий для дня
+     */
+    public $days = [];
+
+    /*
+     * Словарь, где ключ это dayId (ID дня), а значение это массив словарей, где каждый словарь имеет следующие поля:
+     *  - periodId - id периода
      *  - periodStart - начало рабочего периода
      *  - periodEnd - конец рабочего периода
-     *  - createdAt - когда создан
-     *  - updatedAt - когда изменен
-	 *  
      */
-    public $dataByPeriods = []; // массив словарей с данными для графика
-    /* 
-     * Массив словарей, где каждый словарь имеет следующие поля:
-     *  - workTime - общее время работы за дату
-     *  - haveReport - есть ли отчет за дату
-     */
-    public $dataByDate = []; // массив словарей с данными для графика
-    /* 
+    public $periodsTimes = []; // словарь с данными периодов (сортировка по periodStart) (может быть пустым словарем, если периодов нет)
+    
+    /*
      * Cловарь, который имеет следующие поля:
+     *  - staffId - ID сотрудника
+     *  - userVkId - ID страницы VK сотрудника
      *  - name - имя и фамилия сотрудника
-     *  - isOnline - находится ли сотрудник онлайн
+     *  - isWorkingTimeNow - находится ли сотрудник онлайн (исходя из графика на текущее время)
      */
-    public $managerData = []; // массив словарей с данными для графика
+    public $staffData = []; // данные сотрудника, для которого получен график
+
 }
 
-$out = new JobGetSheduleResponse();
+$out = new JobGetScheduleResponse();
 
 //--------------------------------Подключение к базе данных
 try {
@@ -58,148 +74,154 @@ try {
 }
 
 //--------------------------------Проверка пользователя
-require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user_manager.inc.php';
-if (!in_array($user['type'], ['Админ', 'Сотрудник'])) {
-    $out->make_wrong_resp('Нет доступа');
-}
+//require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user_manager.inc.php';
 
-//--------------------------------Валидация $in->managerId и получение имени сотрудника
-$managerData = [];
-$managerId = '';
-$query = "
-    SELECT `managers`.`name`
-    FROM `managers`
-    WHERE `managers`.`id` = :id;
-";
-if (empty($in->managerId)) {//Если входной массив пустой, то получаем имя текущего пользователя
-    $managerId = $user['id'];
-        
+//--------------------------------Валидация $in->staffId и получение имени сотрудника
+$staffData = [];
+$staffId = '';
+if (empty($in->staffId)) {//Если $in->staffId пустая, то получаем имя текущего пользователя
+    $staffId = $user['id'];
+
 } else {
     if ($user['type'] != 'Админ') {
         $out->make_wrong_resp('Вам нельзя смотреть чужое расписание');
     }
-    $managerId = $in->managerId;
+    $staffId = $in->staffId;
 }
-$stmt = $pdo->prepare($query);
+$stmt = $pdo->prepare("
+    SELECT `managers`.`name`
+    FROM `managers`
+    WHERE `managers`.`id` = :id;
+") or $out->make_wrong_resp("Ошибка подготовки запроса (1)");
 $stmt->execute([
-    'id' => $managerId,
-]);
+    'id' => $staffId,
+]) or $out->make_wrong_resp("Ошибка выполнения запроса (1)");
 if ($stmt->rowCount() == 0) {
-    $out->make_wrong_resp("Сотрудник с id {$managerId} не найден");
+    $out->make_wrong_resp("Сотрудник с id {$staffId} не найден");
 }
-$data = $stmt->fetch(PDO::FETCH_ASSOC);
-$managerData['name'] = $data['name'];
-$stmt->closeCursor(); unset($stmt, $data);
-
-//--------------------------------Валидация $in->filterStartDate
-$filterStartDate = date_create($in->filterStartDate, new DateTimeZone("Europe/Moscow"));
-if (!$filterStartDate && !empty($in->filterStartDate)) {
-    $out->make_wrong_resp("Параметр 'filterStartDate' задан некорректно");
-} else { 
-    $filterStartDate = date_create('1000-01-01', new DateTimeZone("Europe/Moscow"));
-}
-$filterStartDate = $filterStartDate->format('Y-m-d');
-
-//--------------------------------Валидация $in->filterEndDate
-$filterEndDate = date_create($in->filterEndDate, new DateTimeZone("Europe/Moscow"));
-if (!$filterEndDate && !empty($in->filterStartDate)) {
-    $out->make_wrong_resp("Параметр 'filterEndDate' задан некорректно");
-} else {
-    $filterEndDate = date_create('3000-01-01', new DateTimeZone("Europe/Moscow"));
-}
-if($filterStartDate > $filterEndDate && !empty($fin->filterStartDate)) $out->make_wrong_resp("Параметр 'filterEndDate' задан некорректно");
-$filterEndDate = $filterEndDate->format('Y-m-d');
+$staff = $stmt->fetch(PDO::FETCH_ASSOC);
+$staffData['name'] = (string) $staff['name'];
+$staffData['staffId'] = (string) $staffId;
+$staffData['userVkId'] = (string) $user['id'];
+$stmt->closeCursor();
+unset($stmt, $data);
 
 //--------------------------------Получение текущей даты и времени
 $nowDateUnformatted = date_create(null, new DateTimeZone("Europe/Moscow"));
 $nowDate = $nowDateUnformatted->format('Y-m-d');
 $nowTime = $nowDateUnformatted->format('H:i:s');
 
-//--------------------------------Заполнение dataByPeriods
-$dataByPeriods = [];
-$query = "
-    SELECT `managers_job_periods`.`id`, `managers_job_periods`.`manager_id`, `managers_job_periods`.`for_date`, `managers_job_periods`.`period_start`, `managers_job_periods`.`period_end`
-    FROM `managers_job_periods` 
-    WHERE `managers_job_periods`.`manager_id`= :manager_id
-    AND `managers_job_periods`.`for_date` >= :filter_start_date
-    AND `managers_job_periods`.`for_date` <= :filter_end_date;
-";
-$params = [
-    'manager_id' => $managerId,
+//--------------------------------Валидация $in->filterStartDate
+$filterStartDate = date_create($in->filterStartDate, new DateTimeZone("Europe/Moscow")); // при неправильной дате принимает значение false
+if (!$filterStartDate && !empty($in->filterStartDate)) {
+    $out->make_wrong_resp("Параметр 'filterStartDate' задан некорректно");
+} 
+elseif (empty($in->filterStartDate)) {
+    $filterStartDate = date_create($nowDate, new DateTimeZone("Europe/Moscow")); // по умолчанию значение начала фильтра = текущая дата - 7 дней
+    $filterStartDate->modify("-7 day");
+}
+$filterStartDate = $filterStartDate->format('Y-m-d');
+//--------------------------------Валидация $in->filterEndDate
+$filterEndDate = date_create($in->filterEndDate, new DateTimeZone("Europe/Moscow"));
+if (!$filterEndDate && !empty($in->filterStartDate)) {
+    $out->make_wrong_resp("Параметр 'filterEndDate' задан некорректно");
+} elseif ($filterStartDate > $filterEndDate && !empty($fin->filterStartDate)) {
+    $out->make_wrong_resp("Параметр 'filterEndDate' задан меньше начальной даты фильтра"); // конец фильтра не может быть меньше начала
+} elseif (empty($in->filterStartDate)) {
+    $filterEndDate = date_create($nowDate, new DateTimeZone("Europe/Moscow"));
+}
+$filterEndDate = $filterEndDate->format('Y-m-d');
+//--------------------------------Заполнение periodsTimes
+$periodsTimes = [];
+$usedDates = [];
+
+$stmt = $pdo->prepare("
+    SELECT `managers_job_time_periods`.`id`, `managers_job_time_periods`.`period_start`, `managers_job_time_periods`.`period_end`, 
+    `managers_job_days`.`date`, `managers_job_days`.`id` AS `day_id`
+    FROM `managers_job_time_periods`
+    LEFT JOIN `managers_job_days` ON `managers_job_days`.`id` = `managers_job_time_periods`.`day_id` 
+    WHERE `managers_job_days`.`manager_id`= :manager_id
+    AND `managers_job_days`.`date` >= :filter_start_date
+    AND `managers_job_days`.`date` <= :filter_end_date;
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
+$stmt->execute([
+    'manager_id' => $staffId,
     'filter_start_date' => $filterStartDate,
     'filter_end_date' => $filterEndDate,
-];
-$stmt = $pdo->prepare($query) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
-    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
-    while($data = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $dataByPeriods[] = [
-            'managerId' => $data['manager_id'],
-            'forDate' => $data['for_date'],
-            'periodStart' => $data['period_start'],
-            'periodEnd' => $data['period_end'],
-        ];
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
+while ($periodsTimesData = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    if (!in_array($periodsTimesData['date'], $usedDates)) {
+        $usedDates[] = $periodsTimesData['date'];
     }
-    $stmt->closeCursor(); unset($stmt);
 
-//--------------------------------Заполнение dataByDate
-$dataByDate = [];
+    $periodsTimes[$periodsTimesData['day_id']][] = [
+        'periodId' => (string) $periodsTimesData['id'],
+        'periodStart' => (string) $periodsTimesData['period_start'],
+        'periodEnd' => (string) $periodsTimesData['period_end'],
+    ];
+}
+$stmt->closeCursor();
+unset($stmt);
+
+//--------------------------------Заполнение days
+
+$days = [];
+$usedDatesFormatted =  join(", ", array_map(function ($element) { // форматируем даты для правильного запроса под формат 'yyyy-mm-dd', 'yyyy-mm-dd', 'yyyy-mm-dd'
+    return "'" . $element . "'";
+},$usedDates));
+
 $stmt = $pdo->prepare("
-    SELECT `managers_job_reports`.`work_time`
-    FROM `managers_job_reports` 
-    WHERE `managers_job_reports`.`manager_id`= :manager_id
-    AND `managers_job_reports`.`for_date` = :for_date;
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (2)');
+    SELECT `managers_job_days`.`id`, `managers_job_days`.`date`, `managers_job_days`.`report`, `managers_job_days`.`is_weekend`, `managers_job_days`.`comment`, 
+    `managers_job_reports`.`id` AS `report_id`, `managers_job_reports`.`work_time` AS `work_time`  
+    FROM `managers_job_days`
+    LEFT JOIN `managers_job_reports` ON `managers_job_days`.date = `managers_job_reports`.`for_date`
+    WHERE `managers_job_days`.`manager_id`= :manager_id
+    AND `managers_job_days`.`date` IN ({$usedDatesFormatted});
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
 
-$usedDates = [];
-foreach ($dataByPeriods as $period) {
-    if (!in_array($period['forDate'], $usedDates)) {
-        $usedDates[] = $period['forDate'];
-    }
-}
-foreach($usedDates as $date){
-    $stmt->execute([
-        'manager_id' => $managerId,
-        'for_date' => $date
-    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
-    $data = $stmt->fetch(PDO::FETCH_ASSOC);
+$stmt->execute([
+    'manager_id' => $staffId
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
 
-    if(!empty($data)) {
-        $dataByDate[] = [
-            'workTime' => $data['work_time'],
-            'haveReport' => '1',
-        ];
-    } else {
-        $dataByDate[] = [
-            'workTime' => '0',
-            'haveReport' => '0',
-        ];
-    }
+while ($daysData = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    $days[] = [
+        'dayId'=> (string) $daysData['id'],
+        'date'=> (string) $daysData['date'],
+        'workTime'=> (string) $daysData['work_time'],
+        'report'=> (string) $daysData['report'],
+        'reportId'=> (string) $daysData['report_id'],
+        'isWeekend'=> (string) $daysData['is_weekend'],
+        'comment'=> (string) $daysData['comment'],
+    ];
 }
-$stmt->closeCursor(); unset($stmt);
+$stmt->closeCursor();
+unset($stmt);
 
 //--------------------------------Проверка,находится ли сотрудник онлайн
 $stmt = $pdo->prepare("
-    SELECT `managers_job_periods`.`id`
-    FROM `managers_job_periods` 
-    WHERE `managers_job_periods`.`manager_id`= :manager_id
-    AND `managers_job_periods`.`for_date` = :now_date
-    AND `managers_job_periods`.`period_start` <= :now_time
-    AND `managers_job_periods`.`period_end` >= :now_time;
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
+    SELECT `managers_job_time_periods`.`id`
+    FROM `managers_job_days`
+    JOIN `managers_job_time_periods` ON `managers_job_days`.`id` = `managers_job_time_periods`.`day_id`
+    WHERE `managers_job_days`.`manager_id`= :manager_id
+    AND `managers_job_days`.`date` = :now_date
+    AND `managers_job_time_periods`.`period_start` >= :now_time
+    AND `managers_job_time_periods`.`period_end` <= :now_time;
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)'); // если есть период текущей даты и времени ставит у словаря staffData параметр isWorkingTimeNow значение 1 иначе 0
 $stmt->execute([
-    'manager_id' => $managerId,
+    'manager_id' => $staffId,
     'now_date' => $nowDate,
     'now_time' => $nowTime,
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
 if ($stmt->rowCount() > 0) {
-    $managerData['isOnline'] = '1';
-} else { 
-    $managerData['isOnline'] = '0';
+    $staffData['isWorkingTimeNow'] = '1';
+} else {
+    $staffData['isWorkingTimeNow'] = '0';
 }
-$stmt->closeCursor(); unset($stmt);
+$stmt->closeCursor();
+unset($stmt);
 //--------------------------------Формирование ответа
 $out->success = '1';
-$out->dataByPeriods = $dataByPeriods;
-$out->dataByDate = $dataByDate;
-$out->managerData = (object) $managerData;
+$out->days = $days;
+$out->periodsTimes = $periodsTimes;
+$out->staffData = (object) $staffData;
 $out->make_resp('');
