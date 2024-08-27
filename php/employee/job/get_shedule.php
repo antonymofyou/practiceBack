@@ -16,17 +16,7 @@ class JobGetShedule extends MainRequestClass {
 }
 $in = new JobGetShedule();
 $in->from_json(file_get_contents('php://input'));
-$in->from_json('{
-    "device": "",
-    "staffId": "1",
-    "filterStartDate": "2024-08-20",
-    "filterEndDate": "2024-08-29",
-    "signature": "aaasdasss"
- }');
- $user = [
-    'id' => '1',
-    'type' => 'Админ',
- ];
+
 // класс ответа
 class JobGetScheduleResponse extends MainResponseClass {
     /*
@@ -74,7 +64,7 @@ try {
 }
 
 //--------------------------------Проверка пользователя
-//require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user_manager.inc.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user_manager.inc.php';
 
 //--------------------------------Валидация $in->staffId и получение имени сотрудника
 $staffData = [];
