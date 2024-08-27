@@ -56,7 +56,7 @@ if($in->action == "delete") {
     $stmt->execute([
         'dayId' => $in->dayId
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
-    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Отчёт не найден");
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Отчёт не найден (1)");
     $day = $stmt->fetch(PDO::FETCH_ASSOC);
         $stmt->closeCursor(); unset($stmt);
 
@@ -84,7 +84,7 @@ if($in->action == "create") {
     $stmt = $pdo->prepare("
         SELECT `id`
         FROM `managers_job_days`
-        WHERE `manager_id` = :userId AND `for_date` = :date;
+        WHERE `manager_id` = :userId AND `date` = :date;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
     $stmt->execute([
         'userId' => $user['id'],
@@ -95,23 +95,23 @@ if($in->action == "create") {
 
     //Валидация setDay['spentTime'], нельзя задать отработанное время за день, который ещё не наступил. date_diff(...)->format('%r%a') возвращает разницу между текущей датой на сервере(гггг-мм-дд) и датой рабочего дня(гггг-мм-дд) в формате полных дней(знак $a). В случае, если текущая дата больше, чем дата рабочего дня, ставится знак минус(%r)
     if (isset($in->setDay['spentTime'])) {
-        if ((int) date_diff(date_create(date('Y-m-d')), date_create($in->setDay['date']))->format('%r%a') > 0) $out->make_wrong_resp('Нельзя задать отработанное время за день, который ещё не наступил');
-        if (((string) (int) $in->setDay['spentTime']) !== ((string) $in->setDay['spentTime']) || (int) $in->setDay['spentTime'] <= 0) $out->make_wrong_resp("Параметр 'spentTime' задан неверно");
-    }
+        if ((int) date_diff(date_create(date('Y-m-d')), date_create($in->setDay['date']))->format('%r%a') > 0) $out->make_wrong_resp("Нельзя задать параметр 'spentTime' за день, который ещё не наступил (1)");
+        if (((string) (int) $in->setDay['spentTime']) !== ((string) $in->setDay['spentTime']) || (int) $in->setDay['spentTime'] <= 0) $out->make_wrong_resp("Параметр 'spentTime' задан неверно (1)");
+    } else $in->setDay['spentTime'] = 0; //Дефолтное значение таблицы
 
     //Валидация setDay['report'], нельзя создать отчёт за день, который ещё не наступил
     if (isset($in->setDay['report'])) {
-        if ((int) date_diff(date_create(date('Y-m-d')), date_create($in->setDay['date']))->format('%r%a') > 0) $out->make_wrong_resp('Нельзя создать отчёт за день, который ещё не наступил');
-        if (!is_string($in->setDay['report'])) $out->make_wrong_resp("Параметр 'report' задан неверно");
-    }
+        if ((int) date_diff(date_create(date('Y-m-d')), date_create($in->setDay['date']))->format('%r%a') > 0) $out->make_wrong_resp("Нельзя задать параметр 'report' за день, который ещё не наступил (1)");
+        if (!is_string($in->setDay['report'])) $out->make_wrong_resp("Параметр 'report' задан неверно (1)");
+    } else $in->setDay['report'] = null;
 
     //Валидация setDay['isWeekend']
-    if (!isset($in->setDay['isWeekend']) || !in_array($in->setDay['isWeekend'], [0, 1])) $out->make_wrong_resp("Параметр 'isWeekend' не задан или задан неверно");
+    if (!in_array($in->setDay['isWeekend'], [0, 1])) $out->make_wrong_resp("Параметр 'isWeekend' не задан или задан неверно (1)");
 
     //Валидация setDay['comment']
     if (isset($in->setDay['comment'])) {
-        if (!is_string($in->setDay['comment'])) $out->make_wrong_resp("Параметр 'comment' задан неверно");
-    }
+        if (!is_string($in->setDay['comment'])) $out->make_wrong_resp("Параметр 'comment' задан неверно (1)");
+    } else $in->setDay['comment'] = null;
 
     //Создание данных в БД
     $stmt = $pdo->prepare("
@@ -126,7 +126,7 @@ if($in->action == "create") {
         'report' => $in->setDay['report'],
         'isWeekend' => $in->setDay['isWeekend'],
         'comment' => $in->setDay['comment']
-    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
+    ]) or $out->make_wrong_resp($in->setDay);
 }
 
 //---Обновление рабочего дня
@@ -143,36 +143,36 @@ if($in->action == "update") {
     $stmt->execute([
         'dayId' => $in->dayId
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (5)');
-    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Отчёт не найден");
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ошибка: Отчёт не найден (2)");
     $day = $stmt->fetch(PDO::FETCH_ASSOC);
     $stmt->closeCursor(); unset($stmt);
 
     //Проверка соответствия пользователя дня и текущего пользователя
-    if ($day['manager_id'] != $user['id']) $out->make_wrong_resp('Нельзя удалить отчёт другого сотрудника');
+    if ($day['manager_id'] != $user['id']) $out->make_wrong_resp('Нельзя обновить отчёт другого сотрудника');
 
     //Валидация setDay['spentTime'], нельзя задать отработанное время за день, который ещё не наступил. date_diff(...)->format('%r%a') возвращает разницу между текущей датой на сервере(гггг-мм-дд) и датой рабочего дня(гггг-мм-дд) в формате полных дней(знак $a). В случае, если текущая дата больше, чем дата рабочего дня, ставится знак минус(%r)
     if (isset($in->setDay['spentTime'])) {
-        if ((int) date_diff(date_create(date('Y-m-d')), date_create($in->setDay['date']))->format('%r%a') > 0) $out->make_wrong_resp('Нельзя задать отработанное время за день, который ещё не наступил');
-        if (((string) (int) $in->setDay['spentTime']) !== ((string) $in->setDay['spentTime']) || (int) $in->setDay['spentTime'] <= 0) $out->make_wrong_resp("Параметр 'spentTime' задан неверно");
-        $setDay['spentTime'] = $in->setDay['spentTime'];
+        if ((int) date_diff(date_create(date('Y-m-d')), date_create($in->setDay['date']))->format('%r%a') > 0) $out->make_wrong_resp("Нельзя задать параметр 'spentTime' за день, который ещё не наступил (2)");
+        if (((string) (int) $in->setDay['spentTime']) !== ((string) $in->setDay['spentTime']) || (int) $in->setDay['spentTime'] <= 0) $out->make_wrong_resp("Параметр 'spentTime' задан неверно (2)");
+        $setDay['spent_time'] = $in->setDay['spentTime'];
     } 
 
     //Валидация setDay['report'], нельзя создать отчёт за день, который ещё не наступил
     if (isset($in->setDay['report'])) {
-        if ((int) date_diff(date_create(date('Y-m-d')), date_create($in->setDay['date']))->format('%r%a') > 0) $out->make_wrong_resp('Нельзя создать отчёт за день, который ещё не наступил');
-        if (!is_string($in->setDay['report'])) $out->make_wrong_resp("Параметр 'report' задан неверно");
-        $setDay['spentTime'] = $in->setDay['spentTime'];
+        if ((int) date_diff(date_create(date('Y-m-d')), date_create($in->setDay['date']))->format('%r%a') > 0) $out->make_wrong_resp("Нельзя задать параметр 'report' за день, который ещё не наступил (2)");
+        if (!is_string($in->setDay['report'])) $out->make_wrong_resp("Параметр 'report' задан неверно (2)");
+        $setDay['report'] = $in->setDay['report'];
     } 
 
     //Валидация setDay['isWeekend']
     if (isset($in->setDay['isWeekend'])) { 
-        if (!in_array($in->setDay['isWeekend'], [0, 1])) $out->make_wrong_resp("Параметр 'isWeekend'задан неверно");
-        $setDay['spentTime'] = $in->setDay['spentTime'];
+        if (!in_array($in->setDay['isWeekend'], [0, 1])) $out->make_wrong_resp("Параметр 'isWeekend' задан неверно (2)");
+        $setDay['is_weekend'] = $in->setDay['isWeekend'];
     }
     
     //Валидация setDay['comment']
     if (isset($in->setDay['comment'])) {
-        if (!is_string($in->setDay['comment'])) $out->make_wrong_resp("Параметр 'comment' задан неверно");
+        if (!is_string($in->setDay['comment'])) $out->make_wrong_resp("Параметр 'comment' задан неверно (2)");
         $setDay['comment'] = $in->setDay['comment'];
     }
 
@@ -194,7 +194,7 @@ if($in->action == "update") {
         SET $values 
         WHERE `id` = :dayId;
     ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
-    $stmt->execute($params) or $out->make_wrong_resp("Ошибка базы данных: выполнение запроса (6)");
+    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
     $stmt->closeCursor(); unset($stmt);  
 }
 
