@@ -27,7 +27,7 @@ $out = new MainResponseClass();
 
 //---Подключение к БД
 try {
-    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_DATABASE_SOCEGE . ";charset=" . DB_CHARSET, DB_USER, DB_PASSWORD, DB_SSL_FLAG === MYSQLI_CLIENT_SSL ? [
+    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_DATABASE_HR . ";charset=" . DB_CHARSET, DB_USER, DB_PASSWORD, DB_SSL_FLAG === MYSQLI_CLIENT_SSL ? [
         PDO::MYSQL_ATTR_SSL_CA => DB_SSL_CA,
         PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
         PDO::MYSQL_ATTR_MULTI_STATEMENTS => false,
@@ -79,7 +79,8 @@ elseif($in->action == "delete") {
 elseif($in->action == "create") {
 
     //Валидация setDay['date']
-    $dayDate = date_create_from_format("Y-m-d", $in->setDay['date']) or $out->make_wrong_resp("Параметр 'date' задан неверно или не задан"); //Проверка на формат
+    if(!isset($in->setDay['date'])) $out->make_wrong_resp("Параметр 'date' не задан"); // 
+    $dayDate = date_create_from_format("Y-m-d", $in->setDay['date']) or $out->make_wrong_resp("Параметр 'date' задан неверно"); //Проверка на формат
     if($dayDate->format("Y-m-d") != $in->setDay['date']) $out->make_wrong_resp("Параметр 'date' задан неверно"); //Проверка на верность даты, выдаёт ошибку если, например, установлен месяц 13 или день 32, которые считаются как первый месяц следующего года или первый день следующего месяца соответственно
 
     //Проверка, существует ли уже день 
@@ -108,7 +109,8 @@ elseif($in->action == "create") {
     } else $in->setDay['report'] = null;
 
     //Валидация setDay['isWeekend']
-    if (!in_array($in->setDay['isWeekend'], [0, 1])) $out->make_wrong_resp("Параметр 'isWeekend' не задан или задан неверно (1)");
+    if (!isset($in->setDay['isWeekend'])) $out->make_wrong_resp("Параметр 'isWeekend' не задан (1)");
+    if (!in_array((string) $in->setDay['isWeekend'], ['0', '1'], true)) $out->make_wrong_resp("Параметр 'isWeekend'задан неверно (1)");
 
     //Валидация setDay['comment']
     if (isset($in->setDay['comment'])) {
@@ -149,30 +151,27 @@ elseif($in->action == "update") {
     $day = $stmt->fetch(PDO::FETCH_ASSOC);
     $stmt->closeCursor(); unset($stmt);
 
+    //Валидация setDay['date']
     if(isset($in->setDay['date'])) {
-        //Валидация setDay['date']
-        $dayDate = date_create_from_format("Y-m-d", $in->setDay['date']) or $out->make_wrong_resp("Параметр 'date' задан неверно (2)"); //Проверка на формат
-        if($dayDate->format("Y-m-d") != $in->setDay['date']) $out->make_wrong_resp("Параметр 'date' задан неверно (3)"); //Проверка на верность даты, выдаёт ошибку если, например, установлен месяц 13 или день 32, которые считаются как первый месяц следующего года или первый день следующего месяца соответственно
 
         //Проверка на существование другого дня на изменяемую дату
         $stmt = $pdo->prepare("
-            SELECT `id`, `manager_id`, `date`
+            SELECT `id`
             FROM `managers_job_days`
-            WHERE `managerId` = :userId AND `date` = :date;
+            WHERE `date` = :date;
         ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
         $stmt->execute([
-            'userId' => $user['id'],
             'date' => $in->setDay['date']
         ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
-        if ($stmt->rowCount() != 0) $out->make_wrong_resp("День для текущего сотрудника на эту дату уже существует (2)");
-        $day = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($stmt->rowCount() != 0 && $stmt->fetch(PDO::FETCH_ASSOC)['id'] != $in->dayId) $out->make_wrong_resp("Другой день на эту дату уже существует");
         $stmt->closeCursor(); unset($stmt);
 
-        $setDay['date'] = $dayDate;
+        $dayDate = date_create_from_format("Y-m-d", $in->setDay['date']) or $out->make_wrong_resp("Параметр 'date' задан неверно (2)"); //Проверка на формат
+        if($dayDate->format("Y-m-d") != $in->setDay['date']) $out->make_wrong_resp("Параметр 'date' задан неверно (3)"); //Проверка на верность даты, выдаёт ошибку если, например, установлен месяц 13 или день 32, которые считаются как первый месяц следующего года или первый день следующего месяца соответственно
+
+        $setDay['date'] = $dayDate->format("Y-m-d");
 
     } else $dayDate = date_create($day['date']); //Дата, привязанная к дню
-        
-    
 
     //Проверка соответствия пользователя дня и текущего пользователя
     if ($day['manager_id'] != $user['id']) $out->make_wrong_resp('Нельзя обновить день другого сотрудника');
@@ -193,7 +192,7 @@ elseif($in->action == "update") {
 
     //Валидация setDay['isWeekend']
     if (isset($in->setDay['isWeekend'])) { 
-        if (!in_array($in->setDay['isWeekend'], [0, 1])) $out->make_wrong_resp("Параметр 'isWeekend' задан неверно (2)");
+        if (!in_array((string) $in->setDay['isWeekend'], ["0", "1"], true)) $out->make_wrong_resp("Параметр 'isWeekend' задан неверно (2)");
         $setDay['is_weekend'] = $in->setDay['isWeekend'];
     }
     
@@ -206,6 +205,8 @@ elseif($in->action == "update") {
     // если ничего обновлять не нужно - то выводим ошибку
     if (empty($setDay)) $out->make_wrong_resp('Ни для одного поля не было запрошено обновление');
 
+    $setDay['updated_at'] = date("Y-m-d H-i-s"); //Актуализирование даты обновления
+
     //Формирование запроса на обновление данных рабочего дня
     $values = [];
     $params = [];
@@ -215,6 +216,7 @@ elseif($in->action == "update") {
     }
     $values = join(', ', $values);
     $params['dayId'] = $in->dayId;
+    
 
     $stmt = $pdo->prepare("
         UPDATE `managers_job_days` 
