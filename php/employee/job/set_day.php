@@ -79,8 +79,8 @@ if($in->action == "delete") {
 elseif($in->action == "create") {
 
     //Валидация setDay['date']
-    $dayDate = date_create_from_format("Y-m-d", $in->setDay['date']) or $out->make_wrong_resp("Параметр 'date' задан неверно или не задан (1)"); //Проверка на формат
-    if($dayDate->format("Y-m-d") != $in->setDay['date']) $out->make_wrong_resp("Параметр 'date' задан неверно или не задан (2)"); //Проверка на верность даты, выдаёт ошибку если, например, установлен месяц 13 или день 32, которые считаются как первый месяц следующего года или первый день следующего месяца соответственно
+    $dayDate = date_create_from_format("Y-m-d", $in->setDay['date']) or $out->make_wrong_resp("Параметр 'date' задан неверно или не задан"); //Проверка на формат
+    if($dayDate->format("Y-m-d") != $in->setDay['date']) $out->make_wrong_resp("Параметр 'date' задан неверно"); //Проверка на верность даты, выдаёт ошибку если, например, установлен месяц 13 или день 32, которые считаются как первый месяц следующего года или первый день следующего месяца соответственно
 
     //Проверка, существует ли уже день 
     $stmt = $pdo->prepare("
@@ -92,7 +92,7 @@ elseif($in->action == "create") {
         'userId' => $user['id'],
         'date' => $in->setDay['date']
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
-    if ($stmt->rowCount() != 0) $out->make_wrong_resp("День для текущего сотрудника на эту дату уже существует");
+    if ($stmt->rowCount() != 0) $out->make_wrong_resp("День для текущего сотрудника на эту дату уже существует (1)");
     $stmt->closeCursor(); unset($stmt);
 
     //Валидация setDay['spentTime'], нельзя задать отработанное время за день, который ещё не наступил. date_diff(...)->format('%r%a') возвращает разницу между текущей датой на сервере(гггг-мм-дд) и датой рабочего дня(гггг-мм-дд) в формате полных дней(знак $a). В случае, если текущая дата больше, чем дата рабочего дня, ставится знак минус(%r)
@@ -149,7 +149,30 @@ elseif($in->action == "update") {
     $day = $stmt->fetch(PDO::FETCH_ASSOC);
     $stmt->closeCursor(); unset($stmt);
 
-    $dayDate = date_create($day['date']); //Дата, привязанная к дню
+    if(isset($in->setDay['date'])) {
+        //Валидация setDay['date']
+        $dayDate = date_create_from_format("Y-m-d", $in->setDay['date']) or $out->make_wrong_resp("Параметр 'date' задан неверно (2)"); //Проверка на формат
+        if($dayDate->format("Y-m-d") != $in->setDay['date']) $out->make_wrong_resp("Параметр 'date' задан неверно (3)"); //Проверка на верность даты, выдаёт ошибку если, например, установлен месяц 13 или день 32, которые считаются как первый месяц следующего года или первый день следующего месяца соответственно
+
+        //Проверка на существование другого дня на изменяемую дату
+        $stmt = $pdo->prepare("
+            SELECT `id`, `manager_id`, `date`
+            FROM `managers_job_days`
+            WHERE `managerId` = :userId AND `date` = :date;
+        ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
+        $stmt->execute([
+            'userId' => $user['id'],
+            'date' => $in->setDay['date']
+        ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
+        if ($stmt->rowCount() != 0) $out->make_wrong_resp("День для текущего сотрудника на эту дату уже существует (2)");
+        $day = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt->closeCursor(); unset($stmt);
+
+        $setDay['date'] = $dayDate;
+
+    } else $dayDate = date_create($day['date']); //Дата, привязанная к дню
+        
+    
 
     //Проверка соответствия пользователя дня и текущего пользователя
     if ($day['manager_id'] != $user['id']) $out->make_wrong_resp('Нельзя обновить день другого сотрудника');
@@ -197,8 +220,8 @@ elseif($in->action == "update") {
         UPDATE `managers_job_days` 
         SET $values 
         WHERE `id` = :dayId;
-    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (6)');
-    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
+    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (7)');
+    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (7)');
     $stmt->closeCursor(); unset($stmt); 
 }
 
