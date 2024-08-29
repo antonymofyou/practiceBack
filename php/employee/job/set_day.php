@@ -39,13 +39,13 @@ try {
 //---Сотрудник может изменять только свои дни, поэтому дальше используется ID текущего пользователя из переменной $user['id']
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/manager_check_user.inc.php';
 
+$today = date_create(date("Y-m-d")); //Текущая дата на сервере
+
 //Валидация действия
 if(!in_array($in->action, ['create', 'delete', 'update'])) $out->make_wrong_resp('Неверное действие');
 
-$today = date_create(date("Y-m-d")); //Текущая дата на сервере
-
 //---Удаление рабочего дня
-if($in->action == "delete") {
+elseif($in->action == "delete") {
     
     //Валидация dayId
     if (((string) (int) $in->dayId) !== ((string) $in->dayId) || (int) $in->dayId <= 0) $out->make_wrong_resp("Параметр 'dayId' задан неверно");
