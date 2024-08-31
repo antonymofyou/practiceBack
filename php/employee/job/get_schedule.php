@@ -7,14 +7,14 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 
 // класс запроса
-class JobGetShedule extends MainRequestClass {
+class JobGetSchedule extends MainRequestClass {
     public $staffId = ''; // ID менеджера, по которому нужно вывести расписание, 
     //при пустом значении выводится расписание текущего пользователя
     public $filterStartDate = ''; // Дата начала за какой период нужно вывести расписание включительно в формате yyyy-mm-dd 
     public $filterEndDate = ''; // Дата конца за какой период нужно вывести расписание включительно в формате yyyy-mm-dd
 
 }
-$in = new JobGetShedule();
+$in = new JobGetSchedule();
 $in->from_json(file_get_contents('php://input'));
 
 // класс ответа
@@ -64,7 +64,7 @@ try {
 }
 
 //--------------------------------Проверка пользователя
-require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user_manager.inc.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/manager_check_user.inc.php';
 
 //--------------------------------Валидация $in->staffId и получение имени  сотрудника
 $staffData = [];
@@ -82,10 +82,10 @@ $stmt = $pdo->prepare("
     SELECT `managers`.`name`
     FROM `managers`
     WHERE `managers`.`id` = :id;
-") or $out->make_wrong_resp("Ошибка подготовки запроса (1)");
+") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (1)");
 $stmt->execute([
     'id' => $staffId,
-]) or $out->make_wrong_resp("Ошибка выполнения запроса (1)");
+]) or $out->make_wrong_resp("Ошибка базы данных: выполнение запроса (1)");
 if ($stmt->rowCount() == 0) {
     $out->make_wrong_resp("Сотрудник с id {$staffId} не найден");
 }
@@ -104,26 +104,23 @@ $nowTime = $nowDateUnformatted->format('H:i:s');
 //--------------------------------Валидация $in->filterStartDate
 $filterStartDate = date_create($in->filterStartDate, new DateTimeZone("Europe/Moscow")); // при неправильной дате принимает значение false
 if (!$filterStartDate && !empty($in->filterStartDate)) {
-    $out->make_wrong_resp("Параметр 'filterStartDate' задан некорректно");
-} 
-elseif (empty($in->filterStartDate)) {
     $filterStartDate = date_create($nowDate, new DateTimeZone("Europe/Moscow")); // по умолчанию значение начала фильтра = текущая дата - 7 дней
     $filterStartDate->modify("-7 day");
 }
 $filterStartDate = $filterStartDate->format('Y-m-d');
+
 //--------------------------------Валидация $in->filterEndDate
 $filterEndDate = date_create($in->filterEndDate, new DateTimeZone("Europe/Moscow"));
 if (!$filterEndDate && !empty($in->filterStartDate)) {
-    $out->make_wrong_resp("Параметр 'filterEndDate' задан некорректно");
+    $filterEndDate = date_create("3000-01-01", new DateTimeZone("Europe/Moscow"));
 } elseif ($filterStartDate > $filterEndDate && !empty($fin->filterStartDate)) {
     $out->make_wrong_resp("Параметр 'filterEndDate' задан меньше начальной даты фильтра"); // конец фильтра не может быть меньше начала
-} elseif (empty($in->filterStartDate)) {
-    $filterEndDate = date_create($nowDate, new DateTimeZone("Europe/Moscow"));
 }
 $filterEndDate = $filterEndDate->format('Y-m-d');
+
 //--------------------------------Заполнение periodsTimes
 $periodsTimes = [];
-$usedDates = [];
+$usedDates = []; // дни, которые есть в периодах у сотрудника
 
 $stmt = $pdo->prepare("
     SELECT `managers_job_time_periods`.`id`, `managers_job_time_periods`.`period_start`, `managers_job_time_periods`.`period_end`, 
@@ -141,7 +138,7 @@ $stmt->execute([
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
 while ($periodsTimesData = $stmt->fetch(PDO::FETCH_ASSOC)) {
     if (!in_array($periodsTimesData['date'], $usedDates)) {
-        $usedDates[] = $periodsTimesData['date'];
+        $usedDates[] = $periodsTimesData['date']; // заполняем днями, которые были в выборке
     }
 
     $periodsTimes[$periodsTimesData['day_id']][] = [
@@ -156,7 +153,7 @@ unset($stmt);
 //--------------------------------Заполнение days
 
 $days = [];
-$usedDatesFormatted =  join(", ", array_map(function ($element) { // форматируем даты для правильного запроса под формат 'yyyy-mm-dd', 'yyyy-mm-dd', 'yyyy-mm-dd'
+$usedDatesFormatted =  join(", ", array_map(function ($element) { // форматируем даты для правильного запроса под формат - 'yyyy-mm-dd', 'yyyy-mm-dd', 'yyyy-mm-dd'
     return "'" . $element . "'";
 },$usedDates));
 
@@ -167,7 +164,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN `managers_job_reports` ON `managers_job_days`.date = `managers_job_reports`.`for_date`
     WHERE `managers_job_days`.`manager_id`= :manager_id
     AND `managers_job_days`.`date` IN ({$usedDatesFormatted});
-") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)'); // вставляем даты, которые были в выборке периодов
 
 $stmt->execute([
     'manager_id' => $staffId
