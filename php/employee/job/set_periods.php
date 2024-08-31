@@ -175,7 +175,7 @@ elseif($in->action == "create") {
 $stmt = $pdo->prepare("
     SELECT `id`, `day_id`, `period_start`, `period_end`
     FROM `managers_job_time_periods`
-    WHERE `day_id` = :dayId;
+    WHERE `day_id` = :dayId ORDER BY `period_start`;
 ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (7)");
 $stmt->execute([
     'dayId' => $in->dayId
@@ -184,9 +184,9 @@ $periods = [];
     while($period = $stmt->fetch(PDO::FETCH_ASSOC))
     {
         $periods[$period['day_id']][] = [
-                'periodId' => (string) $period['id'],
-                'periodStart' => (string) $period['period_start'],
-                'periodEnd' => (string) $period['period_end']
+            'periodId' => (string) $period['id'],
+            'periodStart' => (string) $period['period_start'],
+            'periodEnd' => (string) $period['period_end']
         ];
     }
 $stmt->closeCursor(); unset($stmt);
