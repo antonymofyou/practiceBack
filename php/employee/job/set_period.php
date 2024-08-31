@@ -9,9 +9,9 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 class JobSetPeriod extends MainRequestClass {
     public $action = ''; // Действие, которое нужно сделать (доступные значения: 'create' - создать период; 'delete' - удалить период)
     public $dayId = ''; // ID дня, для которого нужно создать/удалить период работы
-    public $periodId = ''; // ID периода (при $action == 'delete') (период должен относится к указанному $dayId. Если период с указанным ID относится к другому дню с другим dayId, то будет ошибка)
-    public $periodStart = ''; // Время начало периода работы, на которую нужно создать создать или на которую нужно обновить отчет (при $action == 'create')
-    public $periodEnd = ''; // Время конца периода работы, на которую нужно создать создать или на которую нужно обновить отчет (при $action == 'create')
+    public $periodId = ''; // ID периода, который нужно удалить (период должен относится к указанному $dayId. Если период с указанным ID относится к другому дню с другим dayId, то будет ошибка) (при $action == 'delete')
+    public $periodStart = ''; // Время начало периода работы, которое нужно задать периоду работы при создании  (при $action == 'create')
+    public $periodEnd = ''; // Время конца периода работы, которое нужно задать периоду работы при создании (при $action == 'create')
     // период работы periodStart и periodEnd не должны пересекаться с другими периодами
 }
 $in = new JobSetPeriod();
@@ -19,7 +19,8 @@ $in->from_json(file_get_contents('php://input'));
 
 //---Класс ответа
 class JobSetPeriodResponse extends MainResponseClass {
-    /* Словарь, где ключ это dayId (ID дня), а значение это словарь, который имеет имеет следующие поля:
+    /*
+     * Словарь, где ключ это dayId (ID дня), а значение это словарь, который имеет имеет следующие поля:
      *  - periodId - id периода
      *  - periodStart - начало рабочего периода
      *  - periodEnd - конец рабочего периода
@@ -148,7 +149,7 @@ elseif($in->action == "create") {
         $createStart = $startTime->getTimestamp();
         $createEnd = $endTime->getTimestamp();
         foreach ($periods as $period) {
-            if ($period['start'] >= $createStart && $period['start'] <= $createEnd || $createStart >= $period['start'] && $createStart <= $period['end']) $out->make_wrong_resp("Ошибка: Создаваемый период пересекается с существующими");
+            if ($period['start'] >= $createStart && $period['start'] < $createEnd || $createStart >= $period['start'] && $createStart < $period['end']) $out->make_wrong_resp("Ошибка: Создаваемый период пересекается с существующими");
         }
     }
 
@@ -176,15 +177,15 @@ $stmt = $pdo->prepare("
 $stmt->execute([
     'dayId' => $in->dayId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (7)');
-$periods = [];
-    while($period = $stmt->fetch(PDO::FETCH_ASSOC))
-    {
-        $periods[$period['day_id']][] = [
-            'periodId' => (string) $period['id'],
-            'periodStart' => (string) $period['period_start'],
-            'periodEnd' => (string) $period['period_end']
-        ];
-    }
+$periods = []; //Массив с периодами
+while($period = $stmt->fetch(PDO::FETCH_ASSOC))
+{
+    $periods[$period['day_id']][] = [
+        'periodId' => (string) $period['id'],
+        'periodStart' => (string) $period['period_start'],
+        'periodEnd' => (string) $period['period_end']
+    ];
+}
 $stmt->closeCursor(); unset($stmt);
 
 
