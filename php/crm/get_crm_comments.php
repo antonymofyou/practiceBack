@@ -62,17 +62,15 @@ $stmt->execute([
 
 if ($stmt->rowCount() === 0) $out->make_wrong_resp("Не найдено ни одного пользователя с 'userVkId' = {$in->userVkId} ");
 
-$studentData = mysqli_fetch_assoc($stmt->fetch(PDO::FETCH_ASSOC));
+$studentData = $stmt->fetch(PDO::FETCH_ASSOC);
 
 $curatorId = $studentData['user_curator'];
 if ($curatorId == null || empty($curatorId)) $out->make_wrong_resp("У ученика с 'userVkId' = {$in->userVkId} нет куратора");
 
 //--------------------------------Проверка, смотрит ли ученика тот куратор, который указан в БД
-require $_SERVER['DOCUMENT_ROOT'] . 'app/api/includes/check_user.inc.php';
-if (!($user_type == "Куратор") && ($user_vk_id == $curatorId) && ($user_vk_id != changer_user) && !(in_array($user_type, main_managers))) $out->make_wrong_resp('Это не твой ученик');
+if ($user_type == "Куратор" && ($user_vk_id == $curatorId) && ($user_vk_id != changer_user) && !(in_array($user_type, main_managers))) $out->make_wrong_resp('Это не твой ученик');
 
 //--------------------------------Проверка, смотрит ли пользователь комментарии про себя
-require $_SERVER['DOCUMENT_ROOT'] . 'app/api/includes/check_user.inc.php';
 if (!($user_type != "Админ") && ($user_vk_id == $curatorId)) $out->make_wrong_resp('Нельзя смотреть комментарии про себя');
 
 //--------------------------------Вставка новой записи в crm_comment
@@ -86,18 +84,10 @@ $stmt = $pdo->prepare("
 $stmt->execute([
     'user_vk_id' => $in->userVkId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
-/*
-     * Массив словарей, где каждый словарь содержит следующие поля:
-     *  - comment - комментарий
-     *  - date - дата создания в формате yyyy-mm-dd
-     *  - time - время создания в формате hh-mm-ss
-     *  - editor - id создателя комментария
-     *  - editorName - имя создателя комментария
-     *  - editorSurname - фамилия создателя комментария
-     */
+
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-    $comments = [
-        'comment' => $row['crm_comments'],
+    $comments[] = [
+        'comment' => $row['crm_comment'],
         'date' => $row['crm_date'],
         'time' => $row['crm_time'],
         'editor' => $row['crm_editor'],

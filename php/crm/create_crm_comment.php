@@ -49,16 +49,16 @@ $stmt->execute([
 
 if ($stmt->rowCount() === 0) $out->make_wrong_resp("Не найдено ни одного пользователя с 'userVkId' = {$in->userVkId} ");
 
-$studentData = mysqli_fetch_assoc($stmt->fetch(PDO::FETCH_ASSOC));
+$studentData = $stmt->fetch(PDO::FETCH_ASSOC);
 
 $curatorId = $studentData['user_curator'];
+if ($curatorId == null || empty($curatorId)) $out->make_wrong_resp("У ученика с 'userVkId' = {$in->userVkId} нет куратора");
 
 //--------------------------------Проверка, смотрит ли ученика тот куратор, который указан в БД
-require $_SERVER['DOCUMENT_ROOT'] . 'app/api/includes/check_user.inc.php';
-if (!($user_type == "Куратор") && ($user_vk_id == $curatorId) && ($user_vk_id != changer_user) && !(in_array($user_type, main_managers))) $out->make_wrong_resp('Это не твой ученик');
+if ($user_type == "Куратор" && ($user_vk_id == $curatorId) && ($user_vk_id != changer_user) && !(in_array($user_type, main_managers))) $out->make_wrong_resp('Это не твой ученик');
 
 //--------------------------------Валидация $in->comment
-if (empty($comment)) $out->make_wrong_resp("Параметр 'comment' отсутствует");
+if (empty($in->comment)) $out->make_wrong_resp("Параметр 'comment' отсутствует");
 
 //--------------------------------Вставка новой записи в crm_comment
 $stmt = $pdo->prepare("
