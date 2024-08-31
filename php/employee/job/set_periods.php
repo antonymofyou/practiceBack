@@ -164,10 +164,6 @@ elseif($in->action == "create") {
         'periodEnd' => $in->periodEnd
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (6)');
     $stmt->closeCursor(); unset($stmt);
-    // //Получение последнего созданного ID
-    // $periodId = $pdo->lastInsertId();
-    // if(!$periodId) $out->make_wrong_resp('Произошла ошибка при создании периода');
-    // $in->periodId = $pdo->lastInsertId();
 }
 
 //---Формирование ответа
