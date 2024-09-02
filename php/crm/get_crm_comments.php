@@ -2,8 +2,8 @@
 
 header('Content-Type: application/json; charset=utf-8');
 
-require $_SERVER['DOCUMENT_ROOT'] . 'app/api/includes/config_api.inc.php';
-require $_SERVER['DOCUMENT_ROOT'] . 'app/api/includes/root_classes.inc.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 // класс запроса
 class CrmGetComment extends MainRequestClass
@@ -22,7 +22,7 @@ class CrmGetCommentResponce extends MainResponseClass
      *  - comment - комментарий
      *  - date - дата создания в формате yyyy-mm-dd
      *  - time - время создания в формате hh-mm-ss
-     *  - editor - id создателя комментария
+     *  - editorId - id создателя комментария
      *  - editorName - имя создателя комментария
      *  - editorSurname - фамилия создателя комментария
      */
@@ -43,8 +43,8 @@ try {
 }
 
 //--------------------------------Проверка пользователя
-require $_SERVER['DOCUMENT_ROOT'] . 'app/api/includes/check_user.inc.php';
-if (!(in_array($user_type, ['Админ', 'Куратор']))) $out->make_wrong_resp('Нет доступа');
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
+if (!in_array($user_type, ['Админ', 'Куратор'])) $out->make_wrong_resp('Ошибка доступа');
 
 //--------------------------------Валидация $in->userVkId
 if (((string) (int) $in->userVkId) !== ((string) $in->userVkId) || (int) $in->userVkId <= 0) $out->make_wrong_resp("Параметр 'userVkId' задан некорректно или отсутствует");
@@ -71,9 +71,9 @@ if ($curatorId == null || empty($curatorId)) $out->make_wrong_resp("У учен�
 if ($user_type == "Куратор" && ($user_vk_id == $curatorId) && ($user_vk_id != changer_user) && !(in_array($user_type, main_managers))) $out->make_wrong_resp('Это не твой ученик');
 
 //--------------------------------Проверка, смотрит ли пользователь комментарии про себя
-if (!($user_type != "Админ") && ($user_vk_id == $curatorId)) $out->make_wrong_resp('Нельзя смотреть комментарии про себя');
+if (($user_type != "Админ") && ($user_vk_id == $in->userVkId)) $out->make_wrong_resp('Нельзя смотреть комментарии про себя');
 
-//--------------------------------Вставка новой записи в crm_comment
+//--------------------------------Получение  записей из crm_comment по пользователю
 $stmt = $pdo->prepare("
     SELECT `crm_comments`.`crm_date`, `crm_comments`.`crm_time`, `crm_comments`.`crm_editor`, `crm_comments`.`crm_comment`,
            `users`.`user_name`, `users`.`user_surname`
@@ -87,12 +87,12 @@ $stmt->execute([
 
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $comments[] = [
-        'comment' => $row['crm_comment'],
-        'date' => $row['crm_date'],
-        'time' => $row['crm_time'],
-        'editor' => $row['crm_editor'],
-        'editorName' => $row['user_name'],
-        'editorSurname' => $row['user_surname'],
+        'comment' => (string) $row['crm_comment'],
+        'date' => (string) $row['crm_date'],
+        'time' => (string) $row['crm_time'],
+        'editorId' => (string) $row['crm_editor'],
+        'editorName' => (string) $row['user_name'],
+        'editorSurname' => (string) $row['user_surname'],
     ];
 }
 

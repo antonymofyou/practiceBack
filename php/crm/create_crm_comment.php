@@ -2,8 +2,8 @@
 
 header('Content-Type: application/json; charset=utf-8');
 
-require $_SERVER['DOCUMENT_ROOT'] . 'app/api/includes/config_api.inc.php';
-require $_SERVER['DOCUMENT_ROOT'] . 'app/api/includes/root_classes.inc.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 // класс запроса
 class CrmCreateComment extends MainRequestClass
@@ -30,8 +30,8 @@ try {
 }
 
 //--------------------------------Проверка пользователя
-require $_SERVER['DOCUMENT_ROOT'] . 'app/api/includes/check_user.inc.php';
-if (!(in_array($user_type, ['Админ', 'Куратор']))) $out->make_wrong_resp('Нет доступа');
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
+if (!in_array($user_type, ['Админ', 'Куратор'])) $out->make_wrong_resp('Ошибка доступа');
 
 //--------------------------------Валидация $in->userVkId
 if (((string) (int) $in->userVkId) !== ((string) $in->userVkId) || (int) $in->userVkId <= 0) $out->make_wrong_resp("Параметр 'userVkId' задан некорректно или отсутствует");
@@ -52,10 +52,9 @@ if ($stmt->rowCount() === 0) $out->make_wrong_resp("Не найдено ни о�
 $studentData = $stmt->fetch(PDO::FETCH_ASSOC);
 
 $curatorId = $studentData['user_curator'];
-if ($curatorId == null || empty($curatorId)) $out->make_wrong_resp("У ученика с 'userVkId' = {$in->userVkId} нет куратора");
 
 //--------------------------------Проверка, смотрит ли ученика тот куратор, который указан в БД
-if ($user_type == "Куратор" && ($user_vk_id == $curatorId) && ($user_vk_id != changer_user) && !(in_array($user_type, main_managers))) $out->make_wrong_resp('Это не твой ученик');
+if ($user_type == "Куратор" && ($user_vk_id != $curatorId) && ($user_vk_id != changer_user) && !(in_array($user_type, main_managers))) $out->make_wrong_resp('Это не твой ученик');
 
 //--------------------------------Валидация $in->comment
 if (empty($in->comment)) $out->make_wrong_resp("Параметр 'comment' отсутствует");
