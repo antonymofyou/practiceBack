@@ -54,7 +54,10 @@ try {
 } catch (PDOException $exception) {
     $out->make_wrong_resp('Нет соединения с базой данных');
 }
+//---Проверка пользователя (1)
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
 
+//---Валидация ID и получение данных по ученику
 if (((string) (int) $in->userVkId) !== ((string) $in->userVkId) || (int) $in->userVkId <= 0) $out->make_wrong_resp("Параметр 'userVkId' задан неверно или отсутствует");
 $stmt = $pdo->prepare("
     SELECT `users`.`user_vk_id`, `users`.`user_ava_link`, `balance_now`.`bn_balance`, `users`.`user_blocked`, `users`.`user_name`, `users`.`user_surname`, `users`.`user_otch`, `users`.`user_region`, `users`.`user_bdate`, `users`.`user_class_number`, `users`.`user_tel`, `users`.`user_email`, `users`.`user_tarif_num`, `users`.`user_zachet`, `users`.`user_tarif`, `users`.`user_start_course_date`, `users`.`user_curator`, `users`.`user_curator_dz`, `users`.`user_curator_zach`, `users_add`.`user_goal_ball`, `users_add`.`user_goal_vuz`, `users_add`.`goal_budzhet`, `users_add`.`user_osobennosti`, `users`.`user_payday`, `users`.`user_type`
@@ -70,14 +73,17 @@ if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ученик с таким В
 $studentInfo = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
-//Проверка пользователя
-require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
-if($user_type != 'Админ') { //Админы могут смотреть кого-угодно
-    if(!in_array($studentInfo['user_type'], ['Частичный', 'Интенсив'])) $out->make_wrong_resp('Пользователь с таким ВК ID сейчас не является учеником');
-    elseif($studentInfo['user_curator'] != $user_id) $out->make_wrong_resp('Можно смотреть данные только своих учеников'); //Некураторы неадмины не могут получать данные никаких учеников
+//---Проверка пользователя (2)
+if($user_type != 'Админ') { //Админы могут смотреть кого угодно
+    if(!in_array($studentInfo['user_type'], ['Частичный', 'Интенсив'])) { 
+        $out->make_wrong_resp('Пользователь с таким ВК ID сейчас не является учеником');
+    } elseif($studentInfo['user_curator'] != $user_id) {
+        $out->make_wrong_resp('Можно смотреть данные только своих учеников'); //Некураторы неадмины не могут получать данные никаких учеников
+    } 
     $studentInfo['user_email'] = ''; //Только админы получают электронную почту
 }
 
+//---Формирование ответа
 $out->studentInfo = [
     'userVkId' => (string) $studentInfo['user_vk_id'],
     'userAvaLink' => (string) $studentInfo['user_ava_link'],
