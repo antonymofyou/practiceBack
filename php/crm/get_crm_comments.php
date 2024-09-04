@@ -67,7 +67,7 @@ $studentData = $stmt->fetch(PDO::FETCH_ASSOC);
 $curatorId = $studentData['user_curator'];
 
 //--------------------------------Проверка, смотрит ли ученика тот куратор, который указан в БД
-if ($user_type == "Куратор" && ($user_vk_id == $curatorId) && ($user_vk_id != changer_user) && !(in_array($user_type, main_managers))) $out->make_wrong_resp('Это не твой ученик');
+if ($user_type == "Куратор" && ($user_vk_id != $curatorId) && ($user_vk_id != changer_user) && !in_array($user_vk_id, user_info_lookers) && !(in_array($user_type, main_managers))) $out->make_wrong_resp('Это не твой ученик');
 
 //--------------------------------Проверка, смотрит ли пользователь комментарии про себя
 if (($user_type != "Админ") && ($user_vk_id == $in->userVkId)) $out->make_wrong_resp('Нельзя смотреть комментарии про себя');
