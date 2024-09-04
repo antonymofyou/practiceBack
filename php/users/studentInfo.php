@@ -7,7 +7,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 //---Класс запроса
 class UsersStudentInfo extends MainRequestClass {
-    public $vkId = ''; //ВК ID ученика, данные которого нужно получить
+    public $userVkId = ''; //ВК ID ученика, данные которого нужно получить
 }
 $in = new UsersStudentInfo();
 $in->from_json(file_get_contents('php://input'));
@@ -55,16 +55,16 @@ try {
     $out->make_wrong_resp('Нет соединения с базой данных');
 }
 
-if (((string) (int) $in->vkId) !== ((string) $in->vkId) || (int) $in->vkId <= 0) $out->make_wrong_resp("Параметр 'vkId' задан неверно или отсутствует");
+if (((string) (int) $in->userVkId) !== ((string) $in->userVkId) || (int) $in->userVkId <= 0) $out->make_wrong_resp("Параметр 'userVkId' задан неверно или отсутствует");
 $stmt = $pdo->prepare("
-    SELECT `user_vk_id`, `user_ava_link`, `bn_balance`, `user_blocked`, `user_name`, `user_surname`, `user_otch`, `user_region`, `user_bdate`, `user_class_number`, `user_tel`, `user_email`, `user_tarif_num`, `user_zachet`, `user_tarif`, `user_start_course_date`, `user_curator`, `user_curator_dz`, `user_curator_zach`, `user_goal_ball`, `user_goal_vuz`, `user_goal_budzhet`, `user_osobennosti`, `user_payday`, `user_type`
+    SELECT `users`.`user_vk_id`, `users`.`user_ava_link`, `balance_now`.`bn_balance`, `users`.`user_blocked`, `users`.`user_name`, `users`.`user_surname`, `users`.`user_otch`, `users`.`user_region`, `users`.`user_bdate`, `users`.`user_class_number`, `users`.`user_tel`, `users`.`user_email`, `users`.`user_tarif_num`, `users`.`user_zachet`, `users`.`user_tarif`, `users`.`user_start_course_date`, `users`.`user_curator`, `users`.`user_curator_dz`, `users`.`user_curator_zach`, `users_add`.`user_goal_ball`, `users_add`.`user_goal_vuz`, `users_add`.`goal_budzhet`, `users_add`.`user_osobennosti`, `users`.`user_payday`, `users`.`user_type`
     FROM `users` 
     LEFT JOIN `users_add` ON `users`.`user_vk_id` = `users_add`.`user_vk_id`
     LEFT JOIN `balance_now` ON `users`.`user_vk_id` = `balance_now`.`bn_user_id`
-    WHERE `user_vk_id` = :vkId;
+    WHERE `users`.`user_vk_id` = :userVkId;
 ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (1)");
 $stmt->execute([
-    'vkId' => $in->vkId
+    'userVkId' => $in->userVkId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
 if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ученик с таким ВК ID не найден");
 $studentInfo = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -73,8 +73,9 @@ $stmt->closeCursor(); unset($stmt);
 //Проверка пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
 if($user_type != 'Админ') { //Админы могут смотреть кого-угодно
-    if(!in_array($stundentInfo['user_type'], ['Частичный', 'Интенсив'])) $out->make_wrong_resp('Пользователь с таким ВК ID сейчас не является учеником');
+     if(!in_array($studentInfo['user_type'], ['Частичный', 'Интенсив'])) $out->make_wrong_resp('Пользователь с таким ВК ID сейчас не является учеником');
     elseif($studentInfo['user_curator'] != $user_id) $out->make_wrong_resp('Можно смотреть данные только своих учеников'); //Некураторы неадмины не могут получать данные никаких учеников
+     $studentInfo['user_email'] = ''; //Только админы получают электронную почту
 }
 
 $out->studentInfo = [
@@ -99,7 +100,7 @@ $out->studentInfo = [
     'userCuratorZach' => (string) $studentInfo['user_curator_zach'],
     'userGoalBall' => (string) $studentInfo['user_goal_ball'],
     'userGoalVuz' => (string) $studentInfo['user_goal_vuz'],
-    'userGoalBudzhet' => (string) $studentInfo['user_goal_budzhet'],
+    'userGoalBudzhet' => (string) $studentInfo['goal_budzhet'],
     'userOsobennosti' => (string) $studentInfo['user_osobennosti'],
     'userPayday' => (string) $studentInfo['user_payday']
 ];
