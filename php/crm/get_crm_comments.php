@@ -33,7 +33,7 @@ $out = new CrmGetCommentResponce();
 
 //--------------------------------Подключение к базе данных
 try {
-    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_DATABASE_HR . ";charset=" . DB_CHARSET, DB_USER, DB_PASSWORD, DB_SSL_FLAG === MYSQLI_CLIENT_SSL ? [
+    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_DATABASE_SOCEGE . ";charset=" . DB_CHARSET, DB_USER, DB_PASSWORD, DB_SSL_FLAG === MYSQLI_CLIENT_SSL ? [
         PDO::MYSQL_ATTR_SSL_CA => DB_SSL_CA,
         PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
         PDO::MYSQL_ATTR_MULTI_STATEMENTS => false,
@@ -65,7 +65,6 @@ if ($stmt->rowCount() === 0) $out->make_wrong_resp("Не найдено ни о�
 $studentData = $stmt->fetch(PDO::FETCH_ASSOC);
 
 $curatorId = $studentData['user_curator'];
-if ($curatorId == null || empty($curatorId)) $out->make_wrong_resp("У ученика с 'userVkId' = {$in->userVkId} нет куратора");
 
 //--------------------------------Проверка, смотрит ли ученика тот куратор, который указан в БД
 if ($user_type == "Куратор" && ($user_vk_id == $curatorId) && ($user_vk_id != changer_user) && !(in_array($user_type, main_managers))) $out->make_wrong_resp('Это не твой ученик');
@@ -74,6 +73,8 @@ if ($user_type == "Куратор" && ($user_vk_id == $curatorId) && ($user_vk_i
 if (($user_type != "Админ") && ($user_vk_id == $in->userVkId)) $out->make_wrong_resp('Нельзя смотреть комментарии про себя');
 
 //--------------------------------Получение  записей из crm_comment по пользователю
+$comments = [];
+
 $stmt = $pdo->prepare("
     SELECT `crm_comments`.`crm_date`, `crm_comments`.`crm_time`, `crm_comments`.`crm_editor`, `crm_comments`.`crm_comment`,
            `users`.`user_name`, `users`.`user_surname`
