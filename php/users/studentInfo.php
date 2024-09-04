@@ -73,9 +73,9 @@ $stmt->closeCursor(); unset($stmt);
 //Проверка пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
 if($user_type != 'Админ') { //Админы могут смотреть кого-угодно
-     if(!in_array($studentInfo['user_type'], ['Частичный', 'Интенсив'])) $out->make_wrong_resp('Пользователь с таким ВК ID сейчас не является учеником');
+    if(!in_array($studentInfo['user_type'], ['Частичный', 'Интенсив'])) $out->make_wrong_resp('Пользователь с таким ВК ID сейчас не является учеником');
     elseif($studentInfo['user_curator'] != $user_id) $out->make_wrong_resp('Можно смотреть данные только своих учеников'); //Некураторы неадмины не могут получать данные никаких учеников
-     $studentInfo['user_email'] = ''; //Только админы получают электронную почту
+    $studentInfo['user_email'] = ''; //Только админы получают электронную почту
 }
 
 $out->studentInfo = [
