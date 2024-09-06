@@ -53,7 +53,7 @@ $messageAdd = ''; //Дополнение к сообщению
 if (!empty($in->taskNumber)) {
     if (((string) (int) $in->taskNumber) !== ((string) $in->taskNumber || (int) $in->ticketId <= 0 )) $out->make_wrong_resp("Параметр 'taskNumber' задан некорректно");
     elseif ($ticket['taskNumber'] != $in->taskNumber) {
-        $messageAdd .= "задание изменено с \'".$ticket['task_number']."\' на \'".$in->taskNumber."\', ";
+        $messageAdd .= "задание изменено с \'" . $ticket['task_number'] . "\' на \'" . $in->taskNumber . "\', ";
     }
 } else $in->taskNumber = $ticket['taskNumber'];
 
@@ -72,7 +72,7 @@ if (!empty($in->type)) {
             '10' => 'Светлана Леонидовна',
         ];
 
-        $messageAdd .= "тип изменен с \'".$typeToText[$ticket['type']]."\' на \'".$typeToText[$in->type]."\', ";
+        $messageAdd .= "тип изменен с \'" . $typeToText[$ticket['type']] . "\' на \'" . $typeToText[$in->type] . "\', ";
     }
 } else $in->type = $ticket['type'];
 
@@ -89,7 +89,7 @@ if (!empty($in->status)) {
             '10' => 'Архив',
         ];
 
-        $messageAdd .= "статус заявки изменен с \'".$statusToText[$ticket['status']]."\' на \'".$statusToText[$in->status]."\', ";
+        $messageAdd .= "статус заявки изменен с \'" . $statusToText[$ticket['status']] . "\' на \'" . $statusToText[$in->status] . "\', ";
     }
 } else $in->status = $ticket['status'];
 
@@ -104,7 +104,7 @@ if (!empty($in->importance)) {
             '10' => 'Сверхсрочная',
         ];
 
-        $messageAdd .= "срочность изменена с \'".$importanceToText[$ticket['importance']]."\' на \'".$importanceToText[$in->importance]."\', ";
+        $messageAdd .= "срочность изменена с \'" . $importanceToText[$ticket['importance']] . "\' на \'" . $importanceToText[$in->importance] . "\', ";
     }
 } else $in->importance = $ticket['importance'];
 
@@ -112,7 +112,7 @@ if (!empty($in->importance)) {
 if (!is_string($in->message)) $out->make_wrong_resp("Параметр 'message' задан некорректно");
 
 //---Обновление заявки в БД, если есть поля для обновления
-if(!empty($messageAdd)) { 
+if (!empty($messageAdd)) { 
 
     $in->message .= " (" . substr($messageAdd, 0, -2) . ")"; //Добавление $messageAdd в $message без лишней запятой и пробела, но в скобочках
 
@@ -131,7 +131,7 @@ if(!empty($messageAdd)) {
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
     $stmt->closeCursor(); unset($stmt);
 
-}
+} elseif (empty($in->message)) $out->make_wrong_resp('Нет параметров для обновления заявки, нет сообщения'); //Выдаём ошибку если ничего не меняется, при этом отправляется пустое сообщение
 
 //---Добавление сообщения в БД
 $stmt = $pdo->prepare("
@@ -159,7 +159,7 @@ $stmt->closeCursor(); unset($stmt);
 if ($user_id == dz_answerer) { //Если сообщение написал тот, кто отвечает на вопросы
     $botConfig = new ConfigBotVK;
     $request = array(
-        'message' => 'Получен ответ на вопрос ДЗ, заявка №' . $in->ticketId . '. Ссылка https://насотку.рф/support_ticket_dz.php?in->ticketId=' . $in->ticketId,
+        'message' => 'Получен ответ на вопрос ДЗ, заявка №' . $in->ticketId, // . '. Ссылка https://насотку.рф/support_ticket_dz.php?in->ticketId=' . $in->ticketId,
         'user_id' => $row['user_vk_id'],
         'access_token' => $botConfig->gr_key,
         'v' => $botConfig->ver,
@@ -171,7 +171,7 @@ if ($user_id == dz_answerer) { //Если сообщение написал то
 elseif ($user_id == $ticket['user_vk_id']) { //Если сообщение написал тот, кто создавал заявку
     $botConfig = new ConfigBotVK;
     $request = array(
-        'message' => 'Задан еще один вопрос ДЗ создателем заявки №' . $in->ticketId . '. Ссылка https://насотку.рф/support_ticket_dz.php?in->ticketId=' . $in->ticketId,
+        'message' => 'Задан еще один вопрос ДЗ создателем заявки №' . $in->ticketId, // . '. Ссылка https://насотку.рф/support_ticket_dz.php?in->ticketId=' . $in->ticketId,
         'user_id' => dz_answerer,
         'access_token' => $botConfig->gr_key,
         'v' => $botConfig->ver,
@@ -183,7 +183,7 @@ elseif ($user_id == $ticket['user_vk_id']) { //Если сообщение на�
 else { //Во всех остальных случаях
     $botConfig = new ConfigBotVK;
     $request = array(
-        'message' => 'Задан еще один вопрос третьим куратором в заявке №' . $in->ticketId . '. Ссылка https://насотку.рф/support_ticket_dz.php?in->ticketId=' . $in->ticketId,
+        'message' => 'Задан еще один вопрос третьим куратором в заявке №' . $in->ticketId, // . '. Ссылка https://насотку.рф/support_ticket_dz.php?in->ticketId=' . $in->ticketId,
         'user_id' => dz_answerer,
         'access_token' => $botConfig->gr_key,
         'v' => $botConfig->ver,
