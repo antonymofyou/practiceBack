@@ -5,11 +5,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 //---Класс запроса
 class SupportTicketDzMakeMessage extends MainRequestClass {
-    public $ticketId = ''; //ИД заявки, по которой надо отправить сообщение
-    public $message = ''; //Текст сообщения (необяз.)
-
-    public $ticketType = ''; // тип заявки (необяз.)
-	public $comment = ''; // тело сообщения(необяз.)
+    public $ticketId = ''; // ИД заявки, по которой надо отправить сообщение
+    public $message = ''; // текст сообщения (необяз.)
+    public $taskNumber = ''; // номер задания (необяз.)
+    public $type = ''; // тип заявки (необяз.)
 	public $importance = ''; // важность заявки (необяз., по умолчанию 5 - обычная)
 	public $status = ''; // статус заявки (необяз., по умолчанию 0 - новая)
 }
@@ -34,6 +33,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
 if (!(in_array($user_type, ['Админ', 'Куратор']))) $out->make_wrong_resp('Нет доступа');
 
 //---Валидация $in->ticketId
+//Получаем информацию по заявке
+if (((string) (int) $in->ticketId) !== ((string) $in->ticketId) || (int) $in->ticketId <= 0) $out->make_wrong_resp("Параметр 'ticketId' задан некорректно или отсутствует");
 $stmt = $pdo->prepare("
     SELECT `ticket_id`, `task_number`, `type`, `status`, `importance`
     FROM `tickets_dz`
@@ -43,29 +44,154 @@ $stmt->execute([
     'ticketId' => $in->ticketId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
 if ($stmt->rowCount() == 0) $out->make_wrong_resp("Вопрос с ID {$in->ticketId} не найден");
+$ticket = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
-//---Валидация $in->ticketType
-if(isset($in->ticketType)) {
-    if (!in_array($in->ticketType, ['1', '2', '5', '6', '7', '10']) && !empty($in->ticketType)) $out->make_wrong_resp("Параметр 'ticketType' задан некорректно");
-}
+$messageAdd = ''; //Дополнение к сообщению
+
+//---Валидация $in->taskNumber
+if (!empty($in->taskNumber)) {
+    if (((string) (int) $in->taskNumber) !== ((string) $in->taskNumber || (int) $in->ticketId <= 0 )) $out->make_wrong_resp("Параметр 'taskNumber' задан некорректно");
+    elseif ($ticket['taskNumber'] != $in->taskNumber) {
+        $messageAdd .= "задание изменено с \'".$ticket['task_number']."\' на \'".$in->taskNumber."\', ";
+    }
+} else $in->taskNumber = $ticket['taskNumber'];
+
+//---Валидация $in->type
+if (!empty($in->type)) {
+    if (!in_array($in->type, ['1', '2', '5', '6', '7', '10']) && !empty($in->type)) $out->make_wrong_resp("Параметр 'type' задан некорректно");
+    elseif ($ticket['type'] != $in->type) {
+
+        //Словарь типов
+        $typeToText = [
+            '1' => 'Организационные вопросы',
+            '2' => 'Финансы, договора',
+            '5' => 'Антон',
+            '6' => 'Лиза Тюрина',
+            '7' => 'Редактирование ученика',
+            '10' => 'Светлана Леонидовна',
+        ];
+
+        $messageAdd .= "тип изменен с \'".$typeToText[$ticket['type']]."\' на \'".$typeToText[$in->type]."\', ";
+    }
+} else $in->type = $ticket['type'];
+
 //---Валидация $in->status
-if(isset($in->status)) {
-    if (!in_array($in->status, ['0', '1', '5', '10']) && !empty($in->status)) $out->make_wrong_resp("Параметр 'status' задан некорректно");
-    else $in->importance = '0';
-}
+if (!empty($in->status)) {
+    if (!in_array($in->status, ['0', '1', '5', '10'])) $out->make_wrong_resp("Параметр 'status' задан некорректно");
+    elseif ($ticket['status'] != $in->status) {
+
+        //Словарь статусов
+        $statusToText = [
+            '0' => 'Новая',
+            '1' => 'В работе',
+            '5' => 'Завершена',
+            '10' => 'Архив',
+        ];
+
+        $messageAdd .= "статус заявки изменен с \'".$statusToText[$ticket['status']]."\' на \'".$statusToText[$in->status]."\', ";
+    }
+} else $in->status = $ticket['status'];
+
 //---Валидация $in->importance
-if(isset($in->importance)) {
-    if (!in_array($in->importance, ['5', '10']) && !empty($in->importance)) $out->make_wrong_resp("Параметр 'importance' задан некорректно");
-    else $in->importance = '5';
+if (!empty($in->importance)) {
+    if (!in_array($in->importance, ['5', '10'])) $out->make_wrong_resp("Параметр 'importance' задан некорректно");
+    elseif ($ticket['importance'] != $in->importance) {
+
+        //Словарь срочности
+        $importanceToText = [
+            '5' => 'Обычная',
+            '10' => 'Сверхсрочная',
+        ];
+
+        $messageAdd .= "срочность изменена с \'".$importanceToText[$ticket['importance']]."\' на \'".$importanceToText[$in->importance]."\', ";
+    }
+} else $in->importance = $ticket['importance'];
+
+//---Валидация $in->message
+if (!is_string($in->message)) $out->make_wrong_resp("Параметр 'message' задан некорректно");
+
+//---Обновление заявки в БД, если есть поля для обновления
+if(!empty($messageAdd)) { 
+
+    $in->message .= " (" . substr($messageAdd, 0, -2) . ")"; //Добавление $messageAdd в $message без лишней запятой и пробела, но в скобочках
+
+    //Обновление заявки
+    $stmt = $pdo->prepare("
+    UPDATE `tickets_dz`
+    SET `task_number` = :taskNumber, `type` = :type, `status` = :status, `importance` = :importance, `when_changed` = NOW()
+    WHERE `ticket_id` = :ticketId;
+    ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (2)");
+    $stmt->execute([
+        'taskNumber' => $in->taskNumber,
+        'type' => $in->type,
+        'status' => $in->status,
+        'importance' => $in->importance,
+        'ticketId' => $in->ticketId
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
+    $stmt->closeCursor(); unset($stmt);
+
 }
-//---Валидация $in->comment
-if(isset($in->comment)) {
-    if (!is_string($in->comment)) $out->make_wrong_resp("Параметр 'comment' задан некорректно");
+
+//---Добавление сообщения в БД
+$stmt = $pdo->prepare("
+    INSERT INTO `tickets_mess_dz`
+    (`ticket_id`, `user_vk_id`, `comment`, `comment_dtime`)
+    VALUES (:ticketId, :userVkId, :message, NOW());
+    ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (3)");
+$stmt->execute([
+    'ticketId' => $in->ticketId,
+    'userVkId' => $user_id,
+    'comment' => $in->message
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
+$stmt->closeCursor(); unset($stmt);
+
+//---Удаление ?
+$stmt = $pdo->prepare("
+    DELETE FROM `ticket_dz_user`
+    WHERE `ticket_id` = :ticketId;
+    ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (4)");
+$stmt->execute([
+    'ticketId' => $in->ticketId
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
+$stmt->closeCursor(); unset($stmt);
+
+if($user_id == dz_answerer){//Если сообщение написал тот, кто отвечает на вопросы
+	$bot_config = new ConfigBotVK;
+	$req_message= array( 
+		'message' => 'Получен ответ на вопрос ДЗ, заявка №' . $ticket_id . '. Ссылка https://насотку.рф/support_ticket_dz.php?ticket_id=' . $ticket_id,
+		'user_id' => $row['user_vk_id'],
+		'access_token' => $bot_config->gr_key,
+		'v' => $bot_config->ver,
+		);	
+	$get_params = http_build_query ($req_message);
+	file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);
+} 
+
+elseif ($user_id == $ticket['user_vk_id']) { //Если сообщение написал тот, кто создавал заявку
+    $bot_config = new ConfigBotVK;
+    $req_message = array(
+        'message' => 'Задан еще один вопрос ДЗ создателем заявки №' . $ticket_id . '. Ссылка https://насотку.рф/support_ticket_dz.php?ticket_id=' . $ticket_id,
+        'user_id' => dz_answerer,
+        'access_token' => $bot_config->gr_key,
+        'v' => $bot_config->ver,
+    );
+    $get_params = http_build_query($req_message);
+    file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);
+} 
+
+else { //Во всех остальных случаях
+    $bot_config = new ConfigBotVK;
+    $req_message = array(
+        'message' => 'Задан еще один вопрос третьим куратором в заявке №' . $ticket_id . '. Ссылка https://насотку.рф/support_ticket_dz.php?ticket_id=' . $ticket_id,
+        'user_id' => dz_answerer,
+        'access_token' => $bot_config->gr_key,
+        'v' => $bot_config->ver,
+    );
+    $get_params = http_build_query($req_message);
+    file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);
 }
 
-
-
-
-//---Проверка пользователя (2)
+$out->success = "1";
+$out->make_resp('');
 
