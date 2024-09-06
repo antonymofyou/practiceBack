@@ -156,40 +156,40 @@ $stmt->execute([
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
 $stmt->closeCursor(); unset($stmt);
 
-if($user_id == dz_answerer){//Если сообщение написал тот, кто отвечает на вопросы
-	$bot_config = new ConfigBotVK;
-	$req_message= array( 
-		'message' => 'Получен ответ на вопрос ДЗ, заявка №' . $ticket_id . '. Ссылка https://насотку.рф/support_ticket_dz.php?ticket_id=' . $ticket_id,
-		'user_id' => $row['user_vk_id'],
-		'access_token' => $bot_config->gr_key,
-		'v' => $bot_config->ver,
-		);	
-	$get_params = http_build_query ($req_message);
-	file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);
+if ($user_id == dz_answerer) { //Если сообщение написал тот, кто отвечает на вопросы
+    $botConfig = new ConfigBotVK;
+    $request = array(
+        'message' => 'Получен ответ на вопрос ДЗ, заявка №' . $in->ticketId . '. Ссылка https://насотку.рф/support_ticket_dz.php?in->ticketId=' . $in->ticketId,
+        'user_id' => $row['user_vk_id'],
+        'access_token' => $botConfig->gr_key,
+        'v' => $botConfig->ver,
+    );
+    $params = http_build_query($request);
+    file_get_contents('https://api.vk.com/method/messages.send?' . $params);
 } 
 
 elseif ($user_id == $ticket['user_vk_id']) { //Если сообщение написал тот, кто создавал заявку
-    $bot_config = new ConfigBotVK;
-    $req_message = array(
-        'message' => 'Задан еще один вопрос ДЗ создателем заявки №' . $ticket_id . '. Ссылка https://насотку.рф/support_ticket_dz.php?ticket_id=' . $ticket_id,
+    $botConfig = new ConfigBotVK;
+    $request = array(
+        'message' => 'Задан еще один вопрос ДЗ создателем заявки №' . $in->ticketId . '. Ссылка https://насотку.рф/support_ticket_dz.php?in->ticketId=' . $in->ticketId,
         'user_id' => dz_answerer,
-        'access_token' => $bot_config->gr_key,
-        'v' => $bot_config->ver,
+        'access_token' => $botConfig->gr_key,
+        'v' => $botConfig->ver,
     );
-    $get_params = http_build_query($req_message);
-    file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);
+    $params = http_build_query($request);
+    file_get_contents('https://api.vk.com/method/messages.send?' . $params);
 } 
 
 else { //Во всех остальных случаях
-    $bot_config = new ConfigBotVK;
-    $req_message = array(
-        'message' => 'Задан еще один вопрос третьим куратором в заявке №' . $ticket_id . '. Ссылка https://насотку.рф/support_ticket_dz.php?ticket_id=' . $ticket_id,
+    $botConfig = new ConfigBotVK;
+    $request = array(
+        'message' => 'Задан еще один вопрос третьим куратором в заявке №' . $in->ticketId . '. Ссылка https://насотку.рф/support_ticket_dz.php?in->ticketId=' . $in->ticketId,
         'user_id' => dz_answerer,
-        'access_token' => $bot_config->gr_key,
-        'v' => $bot_config->ver,
+        'access_token' => $botConfig->gr_key,
+        'v' => $botConfig->ver,
     );
-    $get_params = http_build_query($req_message);
-    file_get_contents('https://api.vk.com/method/messages.send?' . $get_params);
+    $params = http_build_query($request);
+    file_get_contents('https://api.vk.com/method/messages.send?' . $params);
 }
 
 $out->success = "1";
