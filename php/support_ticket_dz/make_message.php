@@ -1,5 +1,7 @@
 <?php //---Создание сообщения
 
+header('Content-Type: application/json; charset=utf-8');
+
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
@@ -8,11 +10,13 @@ class SupportTicketDzMakeMessage extends MainRequestClass {
     public $ticketId = ''; // ИД заявки, по которой надо отправить сообщение
     public $message = ''; // текст сообщения (необяз.)
     public $taskNumber = ''; // номер задания (необяз.)
-    public $type = ''; // тип заявки (необяз.)
+    public $ticketType = ''; // тип заявки (необяз.)
 	public $importance = ''; // важность заявки (необяз., по умолчанию 5 - обычная)
 	public $status = ''; // статус заявки (необяз., по умолчанию 0 - новая)
 }
 $in = new SupportTicketDzMakeMessage();
+$in->from_json(file_get_contents('php://input'));
+
 
 //---Класс ответа
 $out = new MainResponseClass();
@@ -47,23 +51,25 @@ if ($stmt->rowCount() == 0) $out->make_wrong_resp("Вопрос с ID {$in->tick
 $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
-$messageAdd = ''; //Дополнение к сообщению
+$messageAdd = []; //Массив дополнений к сообщению
 
 //---Валидация $in->taskNumber
 if (!empty($in->taskNumber)) {
-    if (((string) (int) $in->taskNumber) !== ((string) $in->taskNumber || (int) $in->ticketId <= 0 )) $out->make_wrong_resp("Параметр 'taskNumber' задан некорректно");
-    elseif ($ticket['taskNumber'] != $in->taskNumber) {
-        $messageAdd .= "задание изменено с \'" . $ticket['task_number'] . "\' на \'" . $in->taskNumber . "\', ";
+    if (((string) (int) $in->taskNumber) !== ((string) $in->taskNumber) || (int) $in->ticketId <= 0 ) $out->make_wrong_resp("Параметр 'taskNumber' задан некорректно");
+    elseif ($ticket['task_number'] != $in->taskNumber) {
+        if($ticket['task_number'] == null) $ticket['task_number'] = "Не задано";
+        $messageAdd[] = "задание изменено с '{$ticket['task_number']}' на '{$in->taskNumber}'";
     }
-} else $in->taskNumber = $ticket['taskNumber'];
+} else $in->taskNumber = $ticket['task_number'];
 
-//---Валидация $in->type
-if (!empty($in->type)) {
-    if (!in_array($in->type, ['1', '2', '5', '6', '7', '10']) && !empty($in->type)) $out->make_wrong_resp("Параметр 'type' задан некорректно");
-    elseif ($ticket['type'] != $in->type) {
+//---Валидация $in->ticketType
+if (!empty($in->ticketType)) {
+    if (!in_array($in->ticketType, ['0', '1', '2', '5', '6', '7', '10'])) $out->make_wrong_resp("Параметр 'type' задан некорректно");
+    elseif ($ticket['type'] != $in->ticketType) {
 
         //Словарь типов
         $typeToText = [
+            null => 'Не задан', //В случае, если в заявке не было заданного типа
             '1' => 'Организационные вопросы',
             '2' => 'Финансы, договора',
             '5' => 'Антон',
@@ -72,24 +78,25 @@ if (!empty($in->type)) {
             '10' => 'Светлана Леонидовна',
         ];
 
-        $messageAdd .= "тип изменен с \'" . $typeToText[$ticket['type']] . "\' на \'" . $typeToText[$in->type] . "\', ";
+        $messageAdd[] = "тип изменен с '{$typeToText[$ticket['type']]}' на '{$typeToText[$in->ticketType]}'";
     }
-} else $in->type = $ticket['type'];
+} else $in->ticketType = $ticket['type'];
 
 //---Валидация $in->status
-if (!empty($in->status)) {
+if (!empty($in->status) || $in->status === "0") {
     if (!in_array($in->status, ['0', '1', '5', '10'])) $out->make_wrong_resp("Параметр 'status' задан некорректно");
     elseif ($ticket['status'] != $in->status) {
 
         //Словарь статусов
         $statusToText = [
+            null => 'Не задан',
             '0' => 'Новая',
             '1' => 'В работе',
             '5' => 'Завершена',
             '10' => 'Архив',
         ];
 
-        $messageAdd .= "статус заявки изменен с \'" . $statusToText[$ticket['status']] . "\' на \'" . $statusToText[$in->status] . "\', ";
+        $messageAdd[] = "статус заявки изменен с '{$statusToText[$ticket['status']]}' на '{$statusToText[$in->status]}'";
     }
 } else $in->status = $ticket['status'];
 
@@ -100,11 +107,12 @@ if (!empty($in->importance)) {
 
         //Словарь срочности
         $importanceToText = [
+            null => 'Не задана',
             '5' => 'Обычная',
             '10' => 'Сверхсрочная',
         ];
 
-        $messageAdd .= "срочность изменена с \'" . $importanceToText[$ticket['importance']] . "\' на \'" . $importanceToText[$in->importance] . "\', ";
+        $messageAdd[] = "срочность изменена с '{$importanceToText[$ticket['importance']]}' на '{$importanceToText[$in->importance]}'";
     }
 } else $in->importance = $ticket['importance'];
 
@@ -114,17 +122,17 @@ if (!is_string($in->message)) $out->make_wrong_resp("Параметр 'message' 
 //---Обновление заявки в БД, если есть поля для обновления
 if (!empty($messageAdd)) { 
 
-    $in->message .= " (" . substr($messageAdd, 0, -2) . ")"; //Добавление $messageAdd в $message без лишней запятой и пробела, но в скобочках
+    $in->message = trim($in->message . " (" . join(", ", $messageAdd)) . ")"; //Добавление $messageAdd в $message без лишней запятой и пробела, но в скобочках
 
     //Обновление заявки
     $stmt = $pdo->prepare("
-    UPDATE `tickets_dz`
-    SET `task_number` = :taskNumber, `type` = :type, `status` = :status, `importance` = :importance, `when_changed` = NOW()
-    WHERE `ticket_id` = :ticketId;
+        UPDATE `tickets_dz`
+        SET `task_number` = :taskNumber, `type` = :type, `status` = :status, `importance` = :importance, `when_changed` = NOW()
+        WHERE `ticket_id` = :ticketId;
     ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (2)");
     $stmt->execute([
         'taskNumber' => $in->taskNumber,
-        'type' => $in->type,
+        'type' => $in->ticketType,
         'status' => $in->status,
         'importance' => $in->importance,
         'ticketId' => $in->ticketId
@@ -142,11 +150,11 @@ $stmt = $pdo->prepare("
 $stmt->execute([
     'ticketId' => $in->ticketId,
     'userVkId' => $user_id,
-    'comment' => $in->message
+    'message' => $in->message
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
 $stmt->closeCursor(); unset($stmt);
 
-//---Удаление ?
+//---Удаление ??
 $stmt = $pdo->prepare("
     DELETE FROM `ticket_dz_user`
     WHERE `ticket_id` = :ticketId;
@@ -160,7 +168,7 @@ if ($user_id == dz_answerer) { //Если сообщение написал то
     $botConfig = new ConfigBotVK;
     $request = array(
         'message' => 'Получен ответ на вопрос ДЗ, заявка №' . $in->ticketId, // . '. Ссылка https://насотку.рф/support_ticket_dz.php?in->ticketId=' . $in->ticketId,
-        'user_id' => $row['user_vk_id'],
+        'user_id' => $ticket['user_vk_id'],
         'access_token' => $botConfig->gr_key,
         'v' => $botConfig->ver,
     );
