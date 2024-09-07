@@ -164,6 +164,8 @@ $stmt->execute([
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
 $stmt->closeCursor(); unset($stmt);
 
+
+//---Отправление сообщений в ВК
 if ($user_id == dz_answerer) { //Если сообщение написал тот, кто отвечает на вопросы
     $botConfig = new ConfigBotVK;
     $request = array(
