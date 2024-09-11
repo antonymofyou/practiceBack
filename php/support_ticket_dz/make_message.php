@@ -4,6 +4,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/add_task_sending_to_vk.inc.php';
 
 //---Класс запроса
 class SupportTicketDzMakeMessage extends MainRequestClass {
@@ -34,13 +35,13 @@ try {
 
 //---Проверка пользователя (1)
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
-if (!(in_array($user_type, ['Админ', 'Куратор']))) $out->make_wrong_resp('Нет доступа');
+if (!in_array($user_type, ['Админ', 'Куратор'])) $out->make_wrong_resp('Ошибка доступа');
 
 //---Валидация $in->ticketId
 //Получаем информацию по заявке
 if (((string) (int) $in->ticketId) !== ((string) $in->ticketId) || (int) $in->ticketId <= 0) $out->make_wrong_resp("Параметр 'ticketId' задан некорректно или отсутствует");
 $stmt = $pdo->prepare("
-    SELECT `ticket_id`, `task_number`, `type`, `status`, `importance`
+    SELECT `ticket_id`, `user_vk_id`, `task_number`, `type`, `status`, `importance`
     FROM `tickets_dz`
     WHERE `ticket_id` = :ticketId;
 ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (1)");
@@ -164,43 +165,27 @@ $stmt->execute([
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
 $stmt->closeCursor(); unset($stmt);
 
-
-//---Отправление сообщений в ВК
-if ($user_id == dz_answerer) { //Если сообщение написал тот, кто отвечает на вопросы
-    $botConfig = new ConfigBotVK;
-    $request = array(
-        'message' => 'Получен ответ на вопрос ДЗ, заявка №' . $in->ticketId, // . '. Ссылка https://насотку.рф/support_ticket_dz.php?in->ticketId=' . $in->ticketId,
-        'user_id' => $ticket['user_vk_id'],
-        'access_token' => $botConfig->gr_key,
-        'v' => $botConfig->ver,
-    );
-    $params = http_build_query($request);
-    file_get_contents('https://api.vk.com/method/messages.send?' . $params);
+//---Рассылка в ВК
+$users = []; //Массив с пользователями для рассылки, может быть только один пользователь
+$message = ''; //Сообщение для рассылки
+if($user_id == dz_answerer)  { //Если сообщение написал тот, кто отвечает на вопросы
+    $users[] = $ticket['user_vk_id'];
+    $message = "Получен ответ на вопрос ДЗ, заявка №{$in->ticketId}";
 } 
 
 elseif ($user_id == $ticket['user_vk_id']) { //Если сообщение написал тот, кто создавал заявку
-    $botConfig = new ConfigBotVK;
-    $request = array(
-        'message' => 'Задан еще один вопрос ДЗ создателем заявки №' . $in->ticketId, // . '. Ссылка https://насотку.рф/support_ticket_dz.php?in->ticketId=' . $in->ticketId,
-        'user_id' => dz_answerer,
-        'access_token' => $botConfig->gr_key,
-        'v' => $botConfig->ver,
-    );
-    $params = http_build_query($request);
-    file_get_contents('https://api.vk.com/method/messages.send?' . $params);
-} 
-
-else { //Во всех остальных случаях
-    $botConfig = new ConfigBotVK;
-    $request = array(
-        'message' => 'Задан еще один вопрос третьим куратором в заявке №' . $in->ticketId, // . '. Ссылка https://насотку.рф/support_ticket_dz.php?in->ticketId=' . $in->ticketId,
-        'user_id' => dz_answerer,
-        'access_token' => $botConfig->gr_key,
-        'v' => $botConfig->ver,
-    );
-    $params = http_build_query($request);
-    file_get_contents('https://api.vk.com/method/messages.send?' . $params);
+    $users[] = dz_answerer;
+    $message = "Задан ещё один вопрос ДЗ создателем заявки №{$in->ticketId}";
 }
+
+else { //Если сообщение написал кто-то третий
+    $users[] = dz_answerer;
+    $message = "Задан ещё один вопрос третьим куратором в заявке №{$in->ticketId}";
+}
+
+$mysqli = mysqli_init();
+$mysqli->real_connect(DB_HOST, DB_USER, DB_PASSWORD, DB_DATABASE_SOCEGE, NULL, NULL, DB_FLAGS) or $out->make_wrong_resp("Нет соединения с базой данных (2)");
+addTaskSendingToVk($mysqli, $users, $message)[0]['success'] or $out->make_wrong_resp('Ошибка отправки рассылки в ВК');
 
 $out->success = "1";
 $out->make_resp('');
