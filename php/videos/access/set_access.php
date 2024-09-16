@@ -98,7 +98,7 @@ $stmt->closeCursor(); unset($stmt);
 //---Валидация $in->videosAccess[...]['access']
 foreach ($in->videosAccess as $index => $video) {
     if(!isset($video['access'])) $out->make_wrong_resp("Параметр 'access' в 'videosAccess[{$index}]' отсутствует");
-    if(!in_array($video['access'], [0, 1]) || empty($video['access'])) $out->make_wrong_resp("Параметр 'access' в 'videosAccess[{$index}]' задан неверно");
+    if(!in_array((string) $video['access'], ['0', '1'], true)) $out->make_wrong_resp("Параметр 'access' в 'videosAccess[{$index}]' задан неверно");
 };
 
 
