@@ -6,7 +6,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 //---Класс запроса
-class VideosAccessSetVideoAccess extends MainRequestClass {
+class VideosAccessSetAccess extends MainRequestClass {
     public $userVkId = ''; // Идентификатор ВК пользователя, которому нужно отредактировать права к видео
     /* Массив, содержащий словари со следующими полями:
         - videoID - ИД видео, к которому нужно отредактировать права
@@ -14,7 +14,7 @@ class VideosAccessSetVideoAccess extends MainRequestClass {
     */
     public $videosAccess = []; //Массив словарей с данными для редактирования доступа к видео, может содержать только одно видео
 }
-$in = new VideosAccessSetVideoAccess();
+$in = new VideosAccessSetAccess();
 $in->from_json(file_get_contents('php://input'));
 
 
