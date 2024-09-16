@@ -34,12 +34,12 @@ try {
 
 //---Проверка пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
-if($user_type != 'Админ') $out->make_wrong_resp("Ошибка доступа");
+
 
 //---Валидация $in->userVkId
 if (((string) (int) $in->userVkId) !== ((string) $in->userVkId) || (int) $in->userVkId <= 0) $out->make_wrong_resp("Параметр 'userVkId' задан неверно или отсутствует");
 $stmt = $pdo->prepare("
-    SELECT `users`.`user_vk_id`
+    SELECT `user_vk_id`, `user_type`
     FROM `users`
     WHERE `user_vk_id` = :userVkId;
 ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (1)");
@@ -47,22 +47,34 @@ $stmt->execute([
     'userVkId' => $in->userVkId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
 if ($stmt->rowCount() == 0) $out->make_wrong_resp("Пользователь с таким ID не найден");
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
+
+//---Проверка пользователя (2)
+if($user_id == changer_user) { //Если пользователь имеет право изменять права, то проверяется изменяемый пользователь
+    if(!in_array($user['user_type'], ['Частичный', 'Интенсив', 'Пакетник'])) $out->make_wrong_resp("Нельзя изменять права к видео пользователяей, которые не являются учениками");
+} elseif ($user_type != 'Админ') $out->make_wrong_resp("Ошибка доступа"); //Админы могут менять всех 
 
 
 //---Валидация $in->videosAccess[...]['videoId'] 
 $videoIDs = []; //Валидированные ID
 $wheres = []; //Части условия поиска
-$count = 0;
-foreach ($in->videosAccess as $video) {
-    if (((string) (int) $video['videoId']) !== ((string) $video['videoId']) || (int) $video['videoId'] <= 0) $out->make_wrong_resp("Параметр 'videoId' в 'videoAccess[{$count}]' задан неверно или отсутствует");
-    $wheres[] = ":videoId$count";
-    $videoID = "videoId$count";
+foreach ($in->videosAccess as $index => $video) {
+    if (((string) (int) $video['videoId']) !== ((string) $video['videoId']) || (int) $video['videoId'] <= 0) $out->make_wrong_resp("Параметр 'videoId' в 'videosAccess[{$index}]' задан неверно или отсутствует");
+    $wheres[] = ":videoId$index";
+    $videoID = "videoId$index";
     $videoIDs[$videoID] = $video['videoId'];
-    $count++;
 };
 
-$whereClause = '`video_id` = ' . join(' OR `video_id` = ', $wheres); //По полученным ID проводится перебор видео по БД
+//Проверка на дубликаты ИД видео, выдаёт ошибку, если они присутствуют
+$videoIDsDublicates = array_unique(array_diff_assoc($videoIDs, array_unique($videoIDs)));
+if(!empty($videoIDsDublicates)) {
+    $errorIDs = join(", ", $videoIDsDublicates);
+    $out->make_wrong_resp("В массиве 'videosAccess' присутствуют дубликаты по ID {$errorIDs}"); 
+}
+
+//По полученным ID проводится перебор видео по БД
+$whereClause = '`video_id` = ' . join(' OR `video_id` = ', $wheres); 
 
 $stmt = $pdo->prepare("
     SELECT `video_id`
@@ -75,7 +87,7 @@ while($video = $stmt->fetch()) {
     $videos[] = $video['video_id'];
 }
 $videosDiff = array_diff($videoIDs, $videos); //Получение разности массивов между ID, полученными в запрос и ID, полученными из БД. БД не отправит столбцы с ID, которых нет
-if(!empty($videosDiff)) { //Если есть значения, существующие в одном массиве, но не в другом, то выдаём ошибку и эти ID
+if(!empty($videosDiff)) { //Если есть значения, существующие в одном массиве, но не в другом, то выдаёт ошибку и эти ID
     $errorIDs = join(', ', $videosDiff);
     if (count($videosDiff) > 1) $out->make_wrong_resp("Видео с ID {$errorIDs} не найдены");
     else $out->make_wrong_resp("Видео с ID {$errorIDs} не найдено");
@@ -84,10 +96,9 @@ $stmt->closeCursor(); unset($stmt);
 
 
 //---Валидация $in->videosAccess[...]['access']
-$count = 0;
-foreach ($in->videosAccess as $video) {
-   if(!in_array($video['access'], [0, 1])) $out->make_wrong_resp("Параметр 'access' в 'videoAccess[{$count}]' задан неверно или отсутствует");
-   $count++;
+foreach ($in->videosAccess as $index => $video) {
+    if(!isset($video['access'])) $out->make_wrong_resp("Параметр 'access' в 'videosAccess[{$index}]' отсутствует");
+    if(!in_array($video['access'], [0, 1]) || empty($video['access'])) $out->make_wrong_resp("Параметр 'access' в 'videosAccess[{$index}]' задан неверно");
 };
 
 
@@ -95,14 +106,12 @@ foreach ($in->videosAccess as $video) {
 //Формирование множественного добавления
 $params = [];
 $values = [];
-$count = 0;
-foreach($in->videosAccess as $key => $value) {
-    $values[] = "(:videoId$count, :userVkId, :access$count)";
-    $param = "videoId$count";
+foreach($in->videosAccess as $index => $value) {
+    $values[] = "(:videoId$index, :userVkId, :access$index)";
+    $param = "videoId$index";
     $params[$param] = $value['videoId'];
-    $param = "access$count";
+    $param = "access$index";
     $params[$param] = $value['access'];
-    $count++;
 }
 $params['userVkId'] = $in->userVkId;
 $values = join(', ', $values);
