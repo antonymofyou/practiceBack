@@ -1,4 +1,4 @@
-<?php //---Просмотр прав пользователей к видео
+<?php //---Просмотр доступа пользователя к видео
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -65,6 +65,7 @@ $stmt = $pdo->prepare("
     SELECT `videos`.`video_id`, `videos`.`video_shown_name`, `videos`.`video_lesson_num`, `videos`.`video_chapter`, `videos`.`video_public`, `video_access`.`access`, `video_access`.`views` 
     FROM `videos`
     LEFT JOIN `video_access` ON `video_access`.`video_id` = `videos`.`video_id` AND `video_access`.`user_vk_id` = :userVkId
+    ORDER BY `videos`.`video_lesson_num` DESC;
 ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (2)");
 $stmt->execute([
     'userVkId' => $in->userVkId

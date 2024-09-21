@@ -1,4 +1,4 @@
-<?php //---Редактирование прав пользователей к видео
+<?php //---Редактирование доступа пользователя к видео
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -67,9 +67,11 @@ foreach ($in->videosAccess as $index => $video) {
 };
 
 //Проверка на дубликаты ИД видео, выдаёт ошибку, если они присутствуют
-$videoIDsDublicates = array_unique(array_diff_assoc($videoIDs, array_unique($videoIDs)));
-if(!empty($videoIDsDublicates)) {
-    $errorIDs = join(", ", $videoIDsDublicates);
+$videoIDsUnique = array_unique($videoIDs); //Получение массива без дублирующих ID, если они есть
+$videoIDsDublicates = array_diff_assoc($videoIDs, $videoIDsUnique); //Сравнение изначального массива с массивом, где не должно быть дублирующих значений, то есть в случае, если будут дубликаты, то в массиве появится разность массивов, иначе массив будет пуст
+if(!empty($videoIDsDublicates)) { //В случае, если массив сравнения не пуст, то есть дублирующие ID существуют 
+    $videoIDsUniqueDublicates = array_unique($videoIDsDublicates); //Удаление дубликатов полученного массива, например, если кто-то задал три раза видео с одним ID, то в массиве будет только [x], а не [x, x, x]
+    $errorIDs = join(", ", $videoIDsUniqueDublicates);
     $out->make_wrong_resp("В массиве 'videosAccess' присутствуют дубликаты по ID {$errorIDs}"); 
 }
 
@@ -82,7 +84,7 @@ $stmt = $pdo->prepare("
     WHERE $whereClause
 ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (2)");
 $stmt->execute($videoIDs) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
-$videos;
+$videos = [];
 while($video = $stmt->fetch()) {
     $videos[] = $video['video_id'];
 }
