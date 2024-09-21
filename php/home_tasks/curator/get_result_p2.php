@@ -91,13 +91,19 @@ $stmt->closeCursor(); unset($stmt);
 
 //---Валидация userId или taskNum
 if (((string) (int) $in->userVkId) === ((string) $in->userVkId) && (int) $in->userVkId > 0) {
+    $params = [];
+    $params['dzNum'] = $in->dzNum;
+    $params['userVkId'] = $in->userVkId;
     //Добавление проверки на куратора, куратор может смотреть только своих учеников, админ может смотреть кого угодно
     if($user_type == 'Админ') {
         if(((string) (int) $in->curatorId) === ((string) $in->curatorId) && (int) $in->curatorId > 0) $curatorId = $in->curatorId;
     }
     else $curatorId = $user_id;
     
-    if ($curatorId != '') $addCurator = " AND (`users`.`user_curator` = '$curatorId' OR `users`.`user_curator_dz` = '$curatorId')";
+    if ($curatorId != '') { 
+        $addCurator = " AND (`users`.`user_curator` = :curatorId OR `users`.`user_curator_dz` = :curatorId)";
+        $params['curatorId'] = $curatorId;
+    }
     else $addCurator = '';
 
     $stmt = $pdo->prepare("
@@ -114,22 +120,23 @@ if (((string) (int) $in->userVkId) === ((string) $in->userVkId) && (int) $in->us
         WHERE `users`.`user_vk_id` = :userVkId $addCurator
         ORDER BY `ht_user`.`ht_user_status_p2` DESC;
     ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (2)");
-    $stmt->execute([
-        'userVkId' => $in->userVkId,
-        'dzNum' => $in->dzNum
-    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
+    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
     if ($stmt->rowCount() == 0) $out->make_wrong_resp("По запросу ничего не найдено (1)");
     $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $stmt->closeCursor(); unset($stmt);
 } 
 
 elseif (((string) (int) $in->taskNum) === ((string) $in->taskNum) && (int) $in->taskNum > 0) {
+    $params = [];
+    $params['dzNum'] = $in->dzNum;
+    $params['taskNum'] = $in->taskNum;
+    
     if($in->onlyChecked === '1') {
         $onlyCheckedStatus = "('Готово', 'Проверен', 'Отклонен')";
-        $in->onlyChecked = 1;
+        $params['onlyChecked'] = 1;
     } else {
         $onlyCheckedStatus = "('Готово', 'Отклонен')";
-        $in->onlyChecked = 0;
+        $params['onlyChecked'] = 0;
     }
 
     //Добавление проверки на куратора
@@ -139,7 +146,10 @@ elseif (((string) (int) $in->taskNum) === ((string) $in->taskNum) && (int) $in->
     }
     else $curatorId = $user_id;
     
-    if ($curatorId != '') $addCurator = " AND (`users`.`user_curator` = '$curatorId' OR `users`.`user_curator_dz` = '$curatorId')";
+    if ($curatorId != '') { 
+        $addCurator = " AND (`users`.`user_curator` = :curatorId OR `users`.`user_curator_dz` = :curatorId)";
+        $params['curatorId'] = $curatorId;
+    }
     else $addCurator = '';
 
     $stmt = $pdo->prepare("
@@ -158,11 +168,7 @@ elseif (((string) (int) $in->taskNum) === ((string) $in->taskNum) && (int) $in->
         $addCurator
         ORDER BY `ht_user`.`ht_user_date_p2`, `ht_user`.`ht_user_time_p2`;
     ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (3)");
-    $stmt->execute([
-        'dzNum' => $in->dzNum,
-        'taskNum' => $in->taskNum,        
-        'onlyChecked' => $in->onlyChecked
-    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
+    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
     if ($stmt->rowCount() == 0) $out->make_wrong_resp("По запросу ничего не найдено (2)");
     $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $stmt->closeCursor(); unset($stmt);
