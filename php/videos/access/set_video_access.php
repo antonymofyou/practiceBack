@@ -70,7 +70,7 @@ foreach ($in->videosAccess as $index => $video) {
 $videoIDsUnique = array_unique($videoIDs); //Получение массива без дублирующих ID, если они есть
 $videoIDsDublicates = array_diff_assoc($videoIDs, $videoIDsUnique); //Сравнение изначального массива с массивом, где не должно быть дублирующих значений, то есть в случае, если будут дубликаты, то в массиве появится разность массивов, иначе массив будет пуст
 if(!empty($videoIDsDublicates)) { //В случае, если массив сравнения не пуст, то есть дублирующие ID существуют 
-    $videoIDsUniqueDublicates = array_unique($videoIDsDublicates); //Удаление дубликатов полученного массива, например, если кто-то задал три раза видео с одним ID, то в массиве будет только [x], а не [x, x, x]
+    $videoIDsUniqueDublicates = array_unique($videoIDsDublicates); //Удаление дубликатов полученного массива, например, если кто-то задал три раза видео с одним ID, то в массиве будет только [x], а не [x, x]
     $errorIDs = join(", ", $videoIDsUniqueDublicates);
     $out->make_wrong_resp("В массиве 'videosAccess' присутствуют дубликаты по ID {$errorIDs}"); 
 }

@@ -80,8 +80,8 @@ while ($video = $stmt->fetch(PDO::FETCH_ASSOC)) {
         'videoLessonNum' => (string) $video['video_lesson_num'],
         'videoChapter' => (string) $video['video_chapter'],
         'videoPublic' => (string) $video['video_public'],
-        'videoAccess' => (string) $video['access'],
-        'videoViews' => (string) $video['views']
+        'videoAccess' => (string) (int) $video['access'],
+        'videoViews' => (string) (int) $video['views']
     ];
 } $stmt->closeCursor(); unset($stmt);
 
@@ -92,9 +92,9 @@ foreach($videos as $index => $video) {
 } $chapters = array_unique($chapters);
 sort($chapters);
 
-//---Возврат данных
-$out->videos = (object) $videos;
-$out->chapters = (object) $chapters;
+//---Формирование ответа
+$out->videos = $videos;
+$out->chapters = $chapters;
 
 $out->success = "1";
 $out->make_resp('');
