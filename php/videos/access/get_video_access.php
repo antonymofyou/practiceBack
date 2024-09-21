@@ -6,14 +6,14 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 //---Класс запроса
-class VideosAccessGetAccess extends MainRequestClass {
+class VideosAccessGetVideoAccess extends MainRequestClass {
     public $userVkId = ''; // Идентификатор ВК пользователя, чьи права к видео нужно просмотреть
 }
-$in = new VideosAccessGetAccess();
+$in = new VideosAccessGetVideoAccess();
 $in->from_json(file_get_contents('php://input'));
 
 //---Класс ответа
-class VideosAccessGetAccessResponse extends MainResponseClass {
+class VideosAccessGetVideoAccessResponse extends MainResponseClass {
     /* Массив, содержащий словари, содержащие следующие поля:
         - videoId           - ИД видео
         - videoShownName    - Показываемое название видео
@@ -26,7 +26,7 @@ class VideosAccessGetAccessResponse extends MainResponseClass {
     public $videos = []; //Массив с видео
     public $chapters = []; //Массив названий всех разделов полученных видео
 }
-$out = new VideosAccessGetAccessResponse();
+$out = new VideosAccessGetVideoAccessResponse();
 
 //---Подключение к БД
 try {
