@@ -8,11 +8,10 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 //---Класс запроса
 class HomeTasksCuratorGetResultP2 extends MainRequestClass {
     public $dzNum = ''; //Номер ДЗ
-    public $onlyChecked = ''; //Показать ли только проверенные работы при поиске по номеру вопроса(0/1)(необязательно)
+    public $onlyChecked = ''; //Показать ли только проверенные работы при поиске по номеру вопроса(0/1)(необязательно, по умолчанию 0)
 
     //Необходимо одно из: 
-    public $userVkId = ''; //ИД ученика для получения всей работы ученика. При указании $userVkId и $taskNum одновременно, $taskNum будет проигнорировано
-    public $taskNum = ''; //Номер вопроса для получения всех ответов по вопросу
+    public $type = ''; //ИД ученика для получения всей работы ученика, либо номер вопроса для получения всех ответов по вопросу. Формат: userVkId:IdПользователя или taskNum:номерЗадания
     
     public $curatorId = ''; //Если запрашивает админ, то он может указать поиск по работам учеников определённого куратора
 }
@@ -89,11 +88,18 @@ if ($stmt->rowCount() == 0) $out->make_wrong_resp("Задание с таким 
 $homeTask = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
-//---Валидация userId или taskNum
-if (((string) (int) $in->userVkId) === ((string) $in->userVkId) && (int) $in->userVkId > 0) {
+//---Валидация type
+if(!is_string($in->type) || empty($in->type)) $out->make_wrong_resp("Параметр 'type' задан неверно или отсутствует (1)");
+$type = explode(':', $in->type) or $out->make_wrong_resp("Параметр 'type' задан неверно или отсутствует (2)"); 
+if (count($type) != 2) $out->make_wrong_resp("Параметр 'type' задан неверно или отсутствует (3)");
+if (((string) (int) $type[1]) !== ((string) $type[1]) || (int) $type[1] <= 0) $out->make_wrong_resp("ID в параметре 'type' задано неверно или отсутствует");
+
+//---Если type это userVkId
+if ($type[0] == "userVkId") {
     $params = [];
     $params['dzNum'] = $in->dzNum;
-    $params['userVkId'] = $in->userVkId;
+    $params['userVkId'] = $type[1];
+
     //Добавление проверки на куратора, куратор может смотреть только своих учеников, админ может смотреть кого угодно
     if($user_type == 'Админ') {
         if(((string) (int) $in->curatorId) === ((string) $in->curatorId) && (int) $in->curatorId > 0) $curatorId = $in->curatorId;
@@ -126,10 +132,11 @@ if (((string) (int) $in->userVkId) === ((string) $in->userVkId) && (int) $in->us
     $stmt->closeCursor(); unset($stmt);
 } 
 
-elseif (((string) (int) $in->taskNum) === ((string) $in->taskNum) && (int) $in->taskNum > 0) {
+//---Если type это taskNum
+elseif ($type[0] == "taskNum") {
     $params = [];
     $params['dzNum'] = $in->dzNum;
-    $params['taskNum'] = $in->taskNum;
+    $params['taskNum'] = $type[1];
     
     if($in->onlyChecked === '1') {
         $onlyCheckedStatus = "('Готово', 'Проверен', 'Отклонен')";
@@ -174,7 +181,7 @@ elseif (((string) (int) $in->taskNum) === ((string) $in->taskNum) && (int) $in->
     $stmt->closeCursor(); unset($stmt);
 } 
 
-else $out->make_wrong_resp("Параметры 'userVkId' и/или 'taskNum' заданы неверно или отсутствуют");
+else $out->make_wrong_resp("Параметр 'type' задан неверно или отсутствует (4)");
 
 
 //---Формирование ответа
