@@ -29,6 +29,7 @@ class HomeTasksCuratorGetResultP1Response extends MainResponseClass {
         - userAnswer        - Ответ ученика
         - qAnswer           - Правильный ответ
         - selfmade          - Дополнительное задание(0/1, по умолчанию 0)
+        - uq_status         - Правильность ответа(1 - неверный, 2 - частично верный, 3 - верный)
     */
     public $questions = []; //Данные вопросов к заданию
 
@@ -88,7 +89,7 @@ $stmt->closeCursor(); unset($stmt);
 
 
 $stmt = $pdo->prepare("
-    SELECT `ht_user_p1`.`user_ball`, `ht_user_p1`.`real_ball`, `ht_user_p1`.`q_number`, `ht_user_p1`.`user_answer`, `questions`.`selfmade`
+    SELECT `ht_user_p1`.`user_ball`, `ht_user_p1`.`real_ball`, `ht_user_p1`.`q_number`, `ht_user_p1`.`user_answer`, `ht_user_p1`.`q_answer`, `questions`.`selfmade`
     FROM `ht_user_p1`
 	LEFT JOIN `questions` ON `questions`.`q_id` = `ht_user_p1`.`q_id`
 	WHERE `ht_user_p1`.`user_id` = :userVkId AND `ht_user_p1`.`ht_number` = :dzNum;
@@ -103,10 +104,24 @@ $stmt->closeCursor(); unset($stmt);
 
 $sums = ['questionsSum' => count($tasks), 'userBalls' => 0, 'realBalls' => 0, 'mistakes' => 0];
 
-foreach($tasks as $task) {
+
+foreach($tasks as $index => $task) {
     $sums['userBalls'] += (int) $task['user_ball'];
     $sums['realBalls'] += (int) $task['real_ball'];
-    if ($task['user_ball'] != $task['real_ball']) $sums['mistakes']++;
+    $tasks[$index]['uq_status'] = '3';
+
+    if ($task['user_ball'] != $task['real_ball']) {
+
+        $sums['mistakes']++;
+
+        if((int) $task['user_ball'] > 0) {
+            $tasks[$index]['uq_status'] = '2';
+        }
+
+        else {
+            $tasks[$index]['uq_status'] = '1';
+        }
+    }
 }
 
 //---Формирование ответа
@@ -117,12 +132,13 @@ $out->user['htUserStatusP1'] = (string) $status['ht_user_status_p1'];
 
 foreach($tasks as $task) {
     $out->questions[] = [
-        'qNumber' => $task['q_number'],
-        'userBall' => $task['user_ball'],
-        'realBall' => $task['real_ball'],
-        'userAnswer' => $task['user_asnwer'],
-        'qAnswer' => $task['q_answer'],
-        'selfmade' => $task['selfmade']
+        'qNumber' => (string) $task['q_number'],
+        'userBall' => (string) $task['user_ball'],
+        'realBall' => (string) $task['real_ball'],
+        'userAnswer' => (string) $task['user_answer'],
+        'qAnswer' => (string) $task['q_answer'],
+        'selfmade' => (string) $task['selfmade'],
+        'uqStatus' => (string) $task['uq_status']
     ];
 }
 
