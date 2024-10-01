@@ -120,7 +120,7 @@ if ($type[0] == "userVkId") {
 
     $stmt = $pdo->prepare("
         SELECT `users`.`user_vk_id`, `users`.`user_name`, `users`.`user_surname`, `users`.`user_tarif_num`, `users_add`.`user_goal_ball`, `users`.`user_curator`, `users`.`user_curator_dz`, 
-        `ht_user`.`ht_user_id`, `ht_user`.`ht_number`, `ht_user`.`ht_user_checker`, `ht_user`.`ht_user_status_p2`, `questions2`.`q2_id`, `questions2`.`q2_question`, `questions2`.`q2_obyaz_dz`,
+        `ht_user`.`ht_user_id`, `ht_user`.`ht_number`, `ht_user`.`ht_user_checker`, `ht_user`.`ht_user_status_p2`, `ht_user`.`ht_user_tarif_num`, `ht_user`.`ht_user_apell_stud`, `ht_user`.`ht_user_apell_teacher`, `questions2`.`q2_id`, `questions2`.`q2_question`, `questions2`.`q2_obyaz_dz`,
         `ht_user_p2`.`user_id`, `ht_user_p2`.`q_id`, `ht_user_p2`.`q_number`, `ht_user_p2`.`real_ball`, `ht_user_p2`.`user_answer`, `ht_user_p2`.`teacher_json`, `ht_user_p2`.`is_checked`,
         CONCAT(`checkers`.`user_surname`, ' ', `checkers`.`user_name`) AS `checker`
         FROM `users` 
@@ -146,7 +146,7 @@ elseif ($type[0] == "taskNum") {
     $params['dzNum'] = $in->dzNum;
     $params['taskNum'] = $type[1];
     
-    if($in->onlyChecked === '1') {
+    if($in->onlyChecked == 1) {
         $onlyCheckedStatus = "('Готово', 'Проверен', 'Отклонен')";
         $params['onlyChecked'] = 1;
     } else {
@@ -171,7 +171,7 @@ elseif ($type[0] == "taskNum") {
     $stmt = $pdo->prepare("
         SELECT `ht_user_p2`.`user_id`, `ht_user_p2`.`q_id`, `ht_user_p2`.`q_number`, `ht_user_p2`.`real_ball`, `ht_user_p2`.`user_answer`, `ht_user_p2`.`teacher_json`, `ht_user_p2`.`is_checked`,
         `users`.`user_vk_id`, `users`.`user_name`, `users`.`user_surname`, `users`.`user_tarif_num`, `users_add`.`user_goal_ball`, `users`.`user_curator`, `users`.`user_curator_dz`,
-        `ht_user`.`ht_user_id`, `ht_user`.`ht_number`, `ht_user`.`ht_user_checker`, `ht_user`.`ht_user_status_p2`, `questions2`.`q2_id`, `questions2`.`q2_question`, `questions2`.`q2_obyaz_dz`,
+        `ht_user`.`ht_user_id`, `ht_user`.`ht_number`, `ht_user`.`ht_user_checker`, `ht_user`.`ht_user_status_p2`, `ht_user`.`ht_user_tarif_num`, `ht_user`.`ht_user_apell_stud`, `ht_user`.`ht_user_apell_teacher`, `questions2`.`q2_id`, `questions2`.`q2_question`, `questions2`.`q2_obyaz_dz`,
         CONCAT(`checkers`.`user_surname`, ' ', `checkers`.`user_name`) AS `checker`
         FROM `ht_user_p2`
         LEFT JOIN `users` ON `users`.`user_vk_id` = `ht_user_p2`.`user_id`
@@ -210,7 +210,7 @@ foreach($tasks as $task) {
         'isChecked' => (string) $task['is_checked'],
         'htUserChecker' => (string) $task['ht_user_checker'],
         'checker' => (string) $task['checker'],
-        'htUserStatusP2' => (string) $task['ht_user_status_P2'],
+        'htUserStatusP2' => (string) $task['ht_user_status_p2'],
         'htUserTarifNum' => (string) $task['ht_user_tarif_num'],
         'htUserApellStud' => (string) $task['ht_user_apell_stud'],
         'htUserApellTeacher' => (string) $task['ht_user_apell_teacher'],
