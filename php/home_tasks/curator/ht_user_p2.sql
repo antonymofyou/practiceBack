@@ -65,36 +65,3 @@ CREATE TABLE IF NOT EXISTS `questions2` (
   `q2_public` tinyint(1) DEFAULT NULL,
   PRIMARY KEY (`q2_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
- /* Словарь со следующими полями:
-        Поля вопроса:
-        - q2Id                  - ИД вопроса
-        - q2Question            - Текст вопроса
-        - q2ObyazDz             - Обязательность задания(0/1)
-        - isProbnik             - Является ли задание пробником(0/1)
-
-        Поля ответа:
-        - htUserId              - ИД задания ученику
-        - htNumber              - Номер задания
-        - qNumber               - Номер вопроса
-        - qId                   - ИД вопроса
-        - realBall              - Максимальное количество баллов за задание
-        - userAnswer            - Ответ ученика
-        - teacherJson           - JSON с информацией о тексте(??), содержит матрицу с полями: start_pos, finish_pos, color, zacherkn, cur_subcomment
-        - isChecked             - Проверена ли работа(0/1)
-        - htUserChecker         - ИД проверяющего 
-        - checker               - Фамилия и имя проверяющего
-        - htUserStatusP2        - Статус домашнего задания: Выполняется, Готово, Отклонен, Самопров, Проверено, Аппеляция
-        - htUserTarifNum        - Тариф ученика(1: Демократичный, 2: Авторитарный, 3: Тоталитарный)
-        - htUserApellStud       - Текст аппеляции ученика(Только если статус = Аппеляция)
-        - htUserApellTeacher    - Комментарий учителя к аппеляции(Только если статус = Аппеляция)
-    
-        Поля пользователя:
-        - userVkId              - ИД ВК отвечающего ученика
-        - userName              - Имя ученика
-        - userSurname           - Фамилия ученика
-        - userTarifNum          - Тариф ученика(1: Демократичный, 2: Авторитарный, 3: Тоталитарный)
-        - userGoalBall          - Желаемые баллы??
-        - userCurator           - ИД куратора ученика
-        - userCuratorDz         - ИД куратора ученика по ДЗ
-    */
