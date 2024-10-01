@@ -20,7 +20,7 @@ $in->from_json(file_get_contents('php://input'));
 
 //---Класс ответа
 class HomeTasksCuratorGetResultP2Response extends MainResponseClass {
-    /* Словарь со следующими полями:
+    /* Массив словарей со следующими полями:
         Поля вопроса:
         - q2Id                  - ИД вопроса
         - q2Question            - Текст вопроса
@@ -96,21 +96,26 @@ if (((string) (int) $type[1]) !== ((string) $type[1]) || (int) $type[1] <= 0) $o
 
 //---Если type это userVkId
 if ($type[0] == "userVkId") {
+
+    //Проверка на то, является ли пользователь куратором ученика. Админы могут смотреть всех
+    $stmt = $pdo->prepare("
+    SELECT `user_curator`, `user_curator_dz`
+    FROM `users`
+    WHERE `user_vk_id` = :userVkId;
+    ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (2)");
+    $stmt->execute([
+        'userVkId' => $type[1]
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt->closeCursor(); unset($stmt);
+
+    if($user_type == "Куратор" && (!in_array($user_vk_id, [$user['user_curator'], $user['user_curator_dz']]) || empty($user_vk_id))) {
+        $out->make_wrong_resp("Ошибка доступа");
+    }
+
     $params = [];
     $params['dzNum'] = $in->dzNum;
     $params['userVkId'] = $type[1];
-
-    //Добавление проверки на куратора, куратор может смотреть только своих учеников, админ может смотреть кого угодно
-    if($user_type == 'Админ') {
-        if(((string) (int) $in->curatorId) === ((string) $in->curatorId) && (int) $in->curatorId > 0) $curatorId = $in->curatorId;
-    }
-    else $curatorId = $user_id;
-    
-    if ($curatorId != '') { 
-        $addCurator = " AND (`users`.`user_curator` = :curatorId OR `users`.`user_curator_dz` = :curatorId)";
-        $params['curatorId'] = $curatorId;
-    }
-    else $addCurator = '';
 
     $stmt = $pdo->prepare("
         SELECT `users`.`user_vk_id`, `users`.`user_name`, `users`.`user_surname`, `users`.`user_tarif_num`, `users_add`.`user_goal_ball`, `users`.`user_curator`, `users`.`user_curator_dz`, 
@@ -123,13 +128,15 @@ if ($type[0] == "userVkId") {
         LEFT JOIN `users` AS `checkers` ON `checkers`.`user_vk_id`=`ht_user`.`ht_user_checker`
         LEFT JOIN `ht_user_p2` ON `ht_user_p2`.`user_id` = `users`.`user_vk_id` AND `ht_user_p2`.`ht_number`= :dzNum
         LEFT JOIN `questions2` ON `questions2`.`q2_id` = `ht_user_p2`.`q_id`
-        WHERE `users`.`user_vk_id` = :userVkId $addCurator
+        WHERE `users`.`user_vk_id` = :userVkId
         ORDER BY `ht_user`.`ht_user_status_p2` DESC;
-    ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (2)");
-    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
+    ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (3)");
+    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
     if ($stmt->rowCount() == 0) $out->make_wrong_resp("По запросу ничего не найдено (1)");
-    $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $stmt->closeCursor(); unset($stmt);
+
+    
 } 
 
 //---Если type это taskNum
@@ -146,12 +153,13 @@ elseif ($type[0] == "taskNum") {
         $params['onlyChecked'] = 0;
     }
 
-    //Добавление проверки на куратора
+    //Добавление проверки на куратора, куратор может смотреть только своих учеников, админ может смотреть кого угодно
+    $curatorId = '';
     if($user_type == 'Админ') {
         if(((string) (int) $in->curatorId) !== ((string) $in->curatorId) || (int) $in->curatorId <= 0) 
         $curatorId = $in->curatorId;
     }
-    else $curatorId = $user_id;
+    else $curatorId = $user_vk_id;
     
     if ($curatorId != '') { 
         $addCurator = " AND (`users`.`user_curator` = :curatorId OR `users`.`user_curator_dz` = :curatorId)";
@@ -174,10 +182,10 @@ elseif ($type[0] == "taskNum") {
         AND `users`.`user_type` IN ('Частичный', 'Интенсив', 'Админ') AND `ht_user`.`ht_user_status_p2` IN $onlyCheckedStatus AND `ht_user_p2`.`is_checked` = :onlyChecked
         $addCurator
         ORDER BY `ht_user`.`ht_user_date_p2`, `ht_user`.`ht_user_time_p2`;
-    ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (3)");
-    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
+    ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (4)");
+    $stmt->execute($params) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
     if ($stmt->rowCount() == 0) $out->make_wrong_resp("По запросу ничего не найдено (2)");
-    $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $stmt->closeCursor(); unset($stmt);
 } 
 
@@ -185,33 +193,33 @@ else $out->make_wrong_resp("Параметр 'type' задан неверно и
 
 
 //---Формирование ответа
-foreach($result as $value) {
+foreach($tasks as $task) {
     $out->result[] = [
-        'q2Id' => (string) $value['q2_id'],
-        'q2Question' => (string) $value['q2_question'],
-        'q2ObyazDz' => (string) $value['q2_obyaz_dz'],
+        'q2Id' => (string) $task['q2_id'],
+        'q2Question' => (string) $task['q2_question'],
+        'q2ObyazDz' => (string) $task['q2_obyaz_dz'],
         'isProbnik' => (string) $homeTask['is_probnik'],
-        'htUserId' => (string) $value['ht_user_id'],
-        'htNumber' => (string) $value['ht_number'],
-        'qNumber' => (string) $value['q_number'],
-        'qId' => (string) $value['q_id'],
-        'realBall' => (string) $value['real_ball'],
-        'userAnswer' => (string) $value['user_answer'],
-        'teacherJson' => (string) $value['teacher_json'],
-        'isChecked' => (string) $value['is_checked'],
-        'htUserChecker' => (string) $value['ht_user_checker'],
-        'checker' => (string) $value['checker'],
-        'htUserStatusP2' => (string) $value['ht_user_status_P2'],
-        'htUserTarifNum' => (string) $value['ht_user_tarif_num'],
-        'htUserApellStud' => (string) $value['ht_user_apell_stud'],
-        'htUserApellTeacher' => (string) $value['ht_user_apell_teacher'],
-        'userVkId' => (string) $value['user_vk_id'],
-        'userName' => (string) $value['user_name'],
-        'userSurname' => (string) $value['user_surname'],
-        'userTarifNum' => (string) $value['user_tarif_num'],
-        'userGoalBall' => (string) $value['user_goal_ball'],
-        'userCurator' => (string) $value['user_curator'],
-        'userCuratorDz' => (string) $value['user_curator_dz']
+        'htUserId' => (string) $task['ht_user_id'],
+        'htNumber' => (string) $task['ht_number'],
+        'qNumber' => (string) $task['q_number'],
+        'qId' => (string) $task['q_id'],
+        'realBall' => (string) $task['real_ball'],
+        'userAnswer' => (string) $task['user_answer'],
+        'teacherJson' => (string) $task['teacher_json'],
+        'isChecked' => (string) $task['is_checked'],
+        'htUserChecker' => (string) $task['ht_user_checker'],
+        'checker' => (string) $task['checker'],
+        'htUserStatusP2' => (string) $task['ht_user_status_P2'],
+        'htUserTarifNum' => (string) $task['ht_user_tarif_num'],
+        'htUserApellStud' => (string) $task['ht_user_apell_stud'],
+        'htUserApellTeacher' => (string) $task['ht_user_apell_teacher'],
+        'userVkId' => (string) $task['user_vk_id'],
+        'userName' => (string) $task['user_name'],
+        'userSurname' => (string) $task['user_surname'],
+        'userTarifNum' => (string) $task['user_tarif_num'],
+        'userGoalBall' => (string) $task['user_goal_ball'],
+        'userCurator' => (string) $task['user_curator'],
+        'userCuratorDz' => (string) $task['user_curator_dz']
     ];
 }
 
