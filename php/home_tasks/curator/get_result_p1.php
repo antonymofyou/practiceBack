@@ -23,8 +23,6 @@ class HomeTasksCuratorGetResultP1Response extends MainResponseClass {
     public $user = []; //Данные ученика и задания
 
     /* Массив словарей со следующими полями:
-        
-
         - qNumber           - Номер вопроса
         - userBall          - Набрано баллов
         - realBall          - Максимально баллов
@@ -32,10 +30,10 @@ class HomeTasksCuratorGetResultP1Response extends MainResponseClass {
         - qAnswer           - Правильный ответ
         - selfmade          - Дополнительное задание(0/1, по умолчанию 0)
     */
-    public $result = []; //Данные вопросов к заданию
+    public $questions = []; //Данные вопросов к заданию
 
     /* Массив со следующими полями:
-        - questions         - Итого вопросов
+        - questionsSum      - Итого вопросов
         - userBalls         - Итого набрано баллов
         - realBalls         - Всего максимально баллов
         - mistakes          - Итого неверных ответов
@@ -55,6 +53,12 @@ try {
     $out->make_wrong_resp('Нет соединения с базой данных');
 }
 
+//---Проверка пользователя
+require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
+if(!in_array($user_type, ['Админ', 'Куратор'])) {
+    $out->make_wrong_resp('Ошибка доступа');
+}
+
 //---Валидация dzNum
 if (((string) (int) $in->dzNum) !== ((string) $in->dzNum) || (int) $in->dzNum <= 0) $out->make_wrong_resp("Параметр 'dzNum' задан неверно или отсутствует");
 $stmt = $pdo->prepare("
@@ -66,11 +70,12 @@ $stmt->execute([
     'dzNum' => $in->dzNum
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
 if ($stmt->rowCount() == 0) $out->make_wrong_resp("Задание с таким номером не найдено");
+$status = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
 //---Валидация userVkId
 $stmt = $pdo->prepare("
-    SELECT `user_name`, `user_surname`, 
+    SELECT `user_name`, `user_surname`
     FROM `users`
     WHERE `user_vk_id` = :userVkId;
 ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (2)");
@@ -96,21 +101,36 @@ if ($stmt->rowCount() == 0) $out->make_wrong_resp("Задание с таким 
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
+$sums = ['questionsSum' => count($tasks), 'userBalls' => 0, 'realBalls' => 0, 'mistakes' => 0];
 
-//---Проверка пользователя
-require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
-if(!in_array($user_type, ['Админ', 'Куратор'])) {
-    $out->make_wrong_resp('Ошибка доступа');
+foreach($tasks as $task) {
+    $sums['userBalls'] += (int) $task['user_ball'];
+    $sums['realBalls'] += (int) $task['real_ball'];
+    if ($task['user_ball'] != $task['real_ball']) $sums['mistakes']++;
 }
-
-
 
 //---Формирование ответа
+$out->user['userName'] = (string) $user['user_name'];
+$out->user['userSurname'] = (string) $user['user_surname'];
+$out->user['htUserStatusP1'] = (string) $status['ht_user_status_p1'];
+
+
 foreach($tasks as $task) {
-    $out->result[] = [
-        
+    $out->questions[] = [
+        'qNumber' => $task['q_number'],
+        'userBall' => $task['user_ball'],
+        'realBall' => $task['real_ball'],
+        'userAnswer' => $task['user_asnwer'],
+        'qAnswer' => $task['q_answer'],
+        'selfmade' => $task['selfmade']
     ];
 }
+
+$out->sums['questionsSum'] = (string) $sums['questionsSum'];
+$out->sums['userBalls'] = (string) $sums['userBalls'];
+$out->sums['realBalls'] = (string) $sums['realBalls'];
+$out->sums['mistakes'] = (string) $sums['mistakes'];
+
 
 $out->success = "1";
 $out->make_resp('');
