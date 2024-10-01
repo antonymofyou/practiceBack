@@ -106,6 +106,7 @@ if ($type[0] == "userVkId") {
     $stmt->execute([
         'userVkId' => $type[1]
     ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ученик с таким номером не найден");
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     $stmt->closeCursor(); unset($stmt);
 
