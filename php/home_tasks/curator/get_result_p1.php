@@ -60,30 +60,20 @@ if(!in_array($user_type, ['Админ', 'Куратор'])) {
     $out->make_wrong_resp('Ошибка доступа');
 }
 
-//---Валидация dzNum
+//---Валидация dzNum и userVkId
 if (((string) (int) $in->dzNum) !== ((string) $in->dzNum) || (int) $in->dzNum <= 0) $out->make_wrong_resp("Параметр 'dzNum' задан неверно или отсутствует");
+if (((string) (int) $in->userVkId) !== ((string) $in->userVkId) || (int) $in->userVkId <= 0) $out->make_wrong_resp("Параметр 'userVkId' задан неверно или отсутствует");
 $stmt = $pdo->prepare("
-    SELECT `ht_user_status_p1`
-    FROM `ht_user`
-    WHERE `ht_number` = :dzNum;
+    SELECT `users`.`user_name`, `users`.`user_surname`, `ht_user`.`ht_user_status_p1`
+    FROM `users`
+    LEFT JOIN `ht_user` ON `users`.`user_vk_id`=`ht_user`.`user_id` AND `ht_user`.`ht_number` = :dzNum
+    WHERE `users`.`user_type` IN ('Частичный', 'Интенсив', 'Админ', 'Куратор') AND `user_vk_id` = :userVkId;
 ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (1)");
 $stmt->execute([
-    'dzNum' => $in->dzNum
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
-if ($stmt->rowCount() == 0) $out->make_wrong_resp("Задание с таким номером не найдено");
-$status = $stmt->fetch(PDO::FETCH_ASSOC);
-$stmt->closeCursor(); unset($stmt);
-
-//---Валидация userVkId
-$stmt = $pdo->prepare("
-    SELECT `user_name`, `user_surname`
-    FROM `users`
-    WHERE `user_vk_id` = :userVkId;
-") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (2)");
-$stmt->execute([
+    'dzNum' => $in->dzNum,
     'userVkId' => $in->userVkId
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
-if ($stmt->rowCount() == 0) $out->make_wrong_resp("Ученик с таким номером не найден");
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
+if ($stmt->rowCount() == 0) $out->make_wrong_resp("Пользователь с ID {$in->userVkId} не найден или не является учеником");
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
@@ -93,12 +83,12 @@ $stmt = $pdo->prepare("
     FROM `ht_user_p1`
 	LEFT JOIN `questions` ON `questions`.`q_id` = `ht_user_p1`.`q_id`
 	WHERE `ht_user_p1`.`user_id` = :userVkId AND `ht_user_p1`.`ht_number` = :dzNum;
-") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (3)");
+") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (2)");
 $stmt->execute([
     'userVkId' => $in->userVkId,
     'dzNum' => $in->dzNum
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (3)');
-if ($stmt->rowCount() == 0) $out->make_wrong_resp("Задание с таким номером не найдено");
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
+if ($stmt->rowCount() == 0) $out->make_wrong_resp("Домашняя работа №{$in->dzNum} для пользователя {$in->userVkId} не найдена");
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
@@ -127,7 +117,7 @@ foreach($tasks as $index => $task) {
 //---Формирование ответа
 $out->user['userName'] = (string) $user['user_name'];
 $out->user['userSurname'] = (string) $user['user_surname'];
-$out->user['htUserStatusP1'] = (string) $status['ht_user_status_p1'];
+$out->user['htUserStatusP1'] = (string) $user['ht_user_status_p1'];
 
 
 foreach($tasks as $task) {
