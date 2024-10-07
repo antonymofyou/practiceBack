@@ -140,4 +140,3 @@ $out->sums['mistakes'] = (string) $sums['mistakes'];
 
 $out->success = "1";
 $out->make_resp('');
-
