@@ -47,7 +47,7 @@ if(!in_array($user_type, ['Админ', 'Куратор']) && !in_array($user_vk
     $out->make_wrong_resp('Ошибка доступа');
 }
 
-//---Валидация $in->studentId
+//---Валидация $in->userVkId
 if (((string) (int) $in->userVkId) !== ((string) $in->userVkId) || (int) $in->userVkId <= 0) $out->make_wrong_resp("Параметр 'userVkId' задан неверно или отсутствует");
 $stmt = $pdo->prepare("
     SELECT `user_curator`
@@ -57,7 +57,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([
     'userVkId' => $in->userVkId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
-if ($stmt->rowCount() == 0) $out->make_wrong_resp("Пользователь с ID {$in->userVkId} не найден или не является учеником");
+if ($stmt->rowCount() == 0) $out->make_wrong_resp("Пользователь с ID {$in->userVkId} не найден");
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
