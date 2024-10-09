@@ -1,4 +1,4 @@
-<?php // Обновление ДЗ и установка заданию(ям) поля checked
+<?php // Пометка задания как проверенного и сохранение для него проверки
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -39,10 +39,10 @@ if (!in_array($user_type, ['Куратор', 'Админ'])) $out->make_wrong_re
 if ($user_type != 'Админ') {
     // Подготовка запроса для проверки пользователя
     $stmt = $pdo->prepare("
-            SELECT `users`.`user_curator`, `users`.`user_curator_dz`
-            FROM `users` 
-            WHERE `user_vk_id`= :student_id;
-        ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса для проверки пользователя');
+        SELECT `users`.`user_curator`, `users`.`user_curator_dz`
+        FROM `users` 
+        WHERE `user_vk_id`= :student_id;
+    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса для проверки пользователя');
 
     // Выполнение запроса для проверки пользователя
     $stmt->execute(['student_id' => $in->studentId])
@@ -95,9 +95,9 @@ $curAnswer = json_decode($in->jsonData, true);
 
 // ------------------------- Обновление ДЗ -------------------------
 // Преобразование данных
-$teacherComment = $curAnswer['cur_comment'];
+$teacherComment = $pdo->quote($curAnswer['cur_comment']);
 $userBall = $curAnswer['ballov'] === '' ? null : (int)$curAnswer['ballov'];
-$teacherJson = json_encode($curAnswer['add_comments'], JSON_UNESCAPED_UNICODE);
+$teacherJson = $pdo->quote(json_encode($curAnswer['add_comments'], JSON_UNESCAPED_UNICODE));
 
 // Подготовка запроса на обновление ДЗ
 $query = "
