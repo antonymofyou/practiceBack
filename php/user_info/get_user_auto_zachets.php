@@ -68,7 +68,7 @@ if($user_type != "Куратор" && $user['user_curator'] != $user_vk_id && !in
 }
 
 $stmt = $pdo->prepare("
-    SELECT `zachets_auto`.`za_id`, `zachets_auto`.`za_date_start`, `zachets_auto`.`za_deadline`, `zachets_auto`.`za_lesson_numbers`, `zachets_user`.`zu_errors`, `zachets_auto`.`za_max_errors`, `zachets_user`.`zu_popitka`, `zachets_auto`.`za_max_popitok`, `zachets_user`.`zu_status`
+    SELECT `zachets_auto`.`za_id`, `zachets_auto`.`za_date_start`, `zachets_auto`.`za_deadline`, `zachets_auto`.`za_lesson_numbers`, `zachet_user`.`zu_errors`, `zachets_auto`.`za_max_errors`, `zachet_user`.`zu_popitka`, `zachets_auto`.`za_max_popitok`, `zachet_user`.`zu_status`
     FROM `zachets_auto`
     LEFT JOIN `zachet_user` ON `zachet_user`.`zachet_id` = `zachets_auto`.`za_id` AND `zachet_user`.`user_id` = :userVkId
     WHERE `za_showed` = 1
@@ -84,8 +84,8 @@ $stmt->closeCursor(); unset($stmt);
 //Определение возможности для обнуления
 foreach ($zachets as $index => $zachet) {
     $zachets[$index]['obnul'] = '0';
-    //
-    if($zachet['zu_status'] == 'Несдан' && $zachet['zu_popitka'] == $zachet['za_max_popitok']) {
+    //Возможность для обнуления существует, если использовано 3 попытки и зачёт не сдан
+    if($zachet['zu_status'] == 'Несдан' && $zachet['zu_popitka'] == '3') {
         $zachets[$index]['obnul'] = '1';
     }
 }
@@ -93,14 +93,14 @@ foreach ($zachets as $index => $zachet) {
 foreach($zachets as $zachet) {
     $out->zachets[] = [
         'zaId' => (string) $zachet['za_id'],
-        'zaDateStart' => (string) $zachet['zaDateStart'],
-        'zaDeadline' => (string) $zachet['zaDeadline'],
-        'zaLessonNumbers' => (string) $zachet['zaLessonNumbers'],
-        'zuErrors' => (string) $zachet['zuErrors'],
-        'zaMaxErrors' => (string) $zachet['zaMaxErrors'],
-        'zuPopitka' => (string) $zachet['zuPopitka'],
-        'zaMaxPopitok' => (string) $zachet['zaMaxPopitok'],
-        'zuStatus' => (string) $zachet['zuStatus'],
+        'zaDateStart' => (string) $zachet['za_date_start'],
+        'zaDeadline' => (string) $zachet['za_deadline'],
+        'zaLessonNumbers' => (string) $zachet['za_lesson_numbers'],
+        'zuErrors' => (string) $zachet['zu_errors'],
+        'zaMaxErrors' => (string) $zachet['za_max_errors'],
+        'zuPopitka' => (string) $zachet['zu_popitka'],
+        'zaMaxPopitok' => (string) $zachet['za_max_popitok'],
+        'zuStatus' => (string) $zachet['zu_status'],
         'obnul' => (string) $zachet['obnul']
     ];
 }

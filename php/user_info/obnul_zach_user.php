@@ -69,13 +69,13 @@ $zachet = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
 //---Проверка на возможность обнуления
-if($zachet['zu_popitka'] != 3 || $zachet['zu_status'] != 'Несдан') $out->make_wrong_resp("Есть ещё {$zachet['zu_popitka']} попыток или зачёт сдан");
+if($zachet['zu_popitka'] != 3 || $zachet['zu_status'] != 'Несдан') $out->make_wrong_resp("Есть ещё попытки или зачёт сдан");
 
 $stmt = $pdo->prepare("
     SELECT COUNT(*) AS `amount`
     FROM `questions`
     LEFT JOIN `user-question` ON `questions`.`q_id` = `user-question`.`q_id` AND `user-question`.`user_vk_id` = :userVkId
-    WHERE `questions`.`q_public` = '1' AND (`user-question`.`uq_status` = '1' OR `user_question`.`uq_status` = '2');
+    WHERE `questions`.`q_public` = '1' AND (`user-question`.`uq_status` = '1' OR `user-question`.`uq_status` = '2');
 ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (3)");
 $stmt->execute([
     'userVkId' => $in->userVkId
@@ -98,7 +98,6 @@ $stmt->execute([
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
 $stmt->closeCursor(); unset($stmt);
 
-
 //---Создание CRM комментария
 $comment = "Добавлена попыта пересдачи зачёта с ID {$in->zachId}";
 $stmt = $pdo->prepare("
@@ -115,12 +114,12 @@ $stmt->closeCursor(); unset($stmt);
 
 
 //---Сообщение в ВК о добавлении попытки пересдачи
-$user = [$in->userVkId]; //Массив
+$user = [$in->userVkId]; //Массив с одним пользователем, которому нужно отправить сообщение
 $message = "Добавлена попытка к автоматическому зачёту с номером {$in->zachId}";
 
 $mysqli = mysqli_init();
 $mysqli->real_connect(DB_HOST, DB_USER, DB_PASSWORD, DB_DATABASE_SOCEGE, NULL, NULL, DB_FLAGS) or $out->make_wrong_resp("Нет соединения с базой данных (2)");
-addTaskSendingToVk($mysqli, $user, $message)[0]['success'] or $out->make_wrong_resp('Ошибка отправки рассылки в ВК');
+addTaskSendingToVk($mysqli, $user, $message)[0]['success'] or $out->make_wrong_resp('Ошибка отправки сообщения в ВК');
 
 $out->success = "1";
 $out->make_resp('');
