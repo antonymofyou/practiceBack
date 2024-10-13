@@ -69,8 +69,15 @@ if (((string)(int)$in->studentId) !== ((string)$in->studentId) || (int)$in->stud
     $in->studentId = (int)$in->studentId;
 }
 
-// ------------------------- Десериализация JSON -------------------------
+// Валидация и десериализация $in->jsonData
+if (empty($in->jsonData)) {
+    $out->make_wrong_resp('Параметр {jsonData} отсутствует');
+}
+
 $curAnswer = json_decode($in->jsonData, true);
+if (!is_array($curAnswer)) {
+    $out->make_wrong_resp('Параметр {jsonData} задан некорректно');
+}
 
 // ------------------------- Проверка соответствия количества заданий -------------------------
 checkingNumberOfTasks($curAnswer, $in, $out, $pdo);
@@ -93,6 +100,7 @@ $out->success = '1';
 $out->make_resp('');
 
 // ------------------------- Функции для методов -------------------------
+
 /**
  * Функция выполняющая проверку доступа пользователя к методу
  * @param string $userType Тип пользователя (куратор / админ)
@@ -116,14 +124,16 @@ function accessCheck(string $userType, int $userVkId, HomeTaskCuratorReview $in,
         $stmt->execute(['student_id' => $in->studentId])
         or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса для проверки пользователя');
 
+        $stmt->rowCount() != 0 or $out->make_wrong_resp('Нет доступа (1)');
+
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         // Проверка условий доступа
         if ($user['user_curator_dz'] != '' && $user['user_curator_dz'] != '0' && $user['user_curator_dz'] != $userVkId)
-            $out->make_wrong_resp('Нет доступа');
+            $out->make_wrong_resp('Нет доступа (2)');
 
         if (($user['user_curator_dz'] == '' || $user['user_curator_dz'] == '0') && $user['user_curator'] != $userVkId)
-            $out->make_wrong_resp('Нет доступа');
+            $out->make_wrong_resp('Нет доступа (3)');
 
         $stmt->closeCursor();
         unset($stmt);
@@ -131,7 +141,7 @@ function accessCheck(string $userType, int $userVkId, HomeTaskCuratorReview $in,
 }
 
 /**
- * Функция выполняющая проверку соответствия количества заданий
+ * Функция выполняющая проверку соответствия количества вопросов
  * @param array $curAnswer Десериализованный JSON запроса в виде ассоциативного массива
  * @param HomeTaskCuratorReview $in Класс запроса, используются поля studentId, dzNum
  * @param MainResponseClass $out Класс ответа, используется для возврата ошибок
@@ -140,16 +150,18 @@ function accessCheck(string $userType, int $userVkId, HomeTaskCuratorReview $in,
  */
 function checkingNumberOfTasks(array $curAnswer, HomeTaskCuratorReview $in, MainResponseClass $out, PDO $pdo): void
 {
-    // Подготовка запроса для проверки количества заданий
+    // Подготовка запроса для проверки количества вопросов
     $stmt = $pdo->prepare("
         SELECT `q_nums_p2`
         FROM `ht_user` 
-        WHERE `user_id`=:student_id AND `ht_number`=:dz_num;
-    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса для проверки количества заданий');
+        WHERE `user_id` = :student_id AND `ht_number` = :dz_num;
+    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса для проверки количества вопросов');
 
-    // Выполнение запроса для проверки количества заданий
+    // Выполнение запроса для проверки количества вопросов
     $stmt->execute(['student_id' => $in->studentId, 'dz_num' => $in->dzNum])
-    or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса для проверки количества заданий');
+    or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса для проверки количества вопросов');
+
+    $stmt->rowCount() != 0 or $out->make_wrong_resp('Количество вопросов по заданным параметрам отсутствует');
 
     $homeTask = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($homeTask['q_nums_p2'] != count($curAnswer)) $out->make_wrong_resp('Не соответствует количество вопросов');
@@ -182,7 +194,7 @@ function updateHomeTask(int $qNumsP2, array $curAnswer, HomeTaskCuratorReview $i
         $teacherJson = json_encode($curAnswer[$i]['add_comments'], JSON_UNESCAPED_UNICODE);
 
         // Конкатенация запроса
-        $query .= "('" . $in->studentId . "', '" . $in->dzNum . "', '" . $i . "', '" . $pdo->quote($teacherComment) . "', '" . $pdo->quote($teacherJson) . "', " . $userBall . "),";
+        $query .= "(" . $in->studentId . ", " . $in->dzNum . ", " . $i . ", " . $pdo->quote($teacherComment) . ", " . $pdo->quote($teacherJson) . ", " . $userBall . "),";
 
         // Суммирование баллов
         $htUserBallovP2 += (int)$curAnswer[$i]['ballov'];
@@ -210,26 +222,28 @@ function updateHomeTask(int $qNumsP2, array $curAnswer, HomeTaskCuratorReview $i
  */
 function getQuantityOfQuestions(HomeTaskCuratorReview $in, MainResponseClass $out, PDO $pdo): int
 {
-    // Подготовка запроса на получение количества заданий
+    // Подготовка запроса на получение количества вопросов
     $stmt = $pdo->prepare("
         SELECT `q_nums_p2`
         FROM `ht_user` 
         WHERE `user_id` = :student_id
         AND `ht_number` = :dz_num;
-    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса на получение количества заданий');
+    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса на получение количества вопросов');
 
-    // Выполнение запроса на получение количества заданий
+    // Выполнение запроса на получение количества вопросов
     $stmt->execute([
         'student_id' => $in->studentId,
         'dz_num' => $in->dzNum,
-    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса на получение количества заданий');
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса на получение количества вопросов');
+
+    $stmt->rowCount() != 0 or $out->make_wrong_resp('Количество вопросов по заданным параметрам отсутствует');
 
     $homeTask = $stmt->fetch(PDO::FETCH_ASSOC);
 
     $stmt->closeCursor();
     unset($stmt);
 
-    return $homeTask['q_nums_p2'];
+    return (int)$homeTask['q_nums_p2'];
 }
 
 // ------------------------- Методы -------------------------
@@ -309,6 +323,8 @@ function endChecking(int $userVkId, array $curAnswer, HomeTaskCuratorReview $in,
     $stmt->execute(['student_id' => $in->studentId])
     or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса окончания проверки (1)');
 
+    $stmt->rowCount() != 0 or $out->make_wrong_resp('Тариф ученика с заданными параметрами отсутствует');
+
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     $userTarifNum = $user['user_tarif_num'];
 
@@ -348,8 +364,8 @@ function endChecking(int $userVkId, array $curAnswer, HomeTaskCuratorReview $in,
     ";
 
     // Выполнение запроса на обновление ДЗ, не включая тариф
-    $stmt = $pdo->query($queryUpdate);
-    "" or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса окончания проверки (3)');
+    $pdo->query($queryUpdate)
+    or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса окончания проверки (3)');
 
     // ------------------------- ВК бот -------------------------
     // Отправка информации о возврате на доработку ученику через ВК бота
