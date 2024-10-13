@@ -12,7 +12,7 @@ class HomeTaskCuratorChecked extends MainRequestClass
     public $studentId = ''; // ВК ID ученика, обязательное поле
     public $taskNum = ''; // Номер задания, обязательное поле
     public $taskStatus = ''; // Статус задания, обязательное поле
-    public $jsonData = ''; // Данные в json, необязательное поле
+    public $jsonData = ''; // Данные в json, обязательное поле
 }
 
 $in = new HomeTaskCuratorChecked();
@@ -39,23 +39,25 @@ if (!in_array($user_type, ['Куратор', 'Админ'])) $out->make_wrong_re
 if ($user_type != 'Админ') {
     // Подготовка запроса для проверки пользователя
     $stmt = $pdo->prepare("
-        SELECT `users`.`user_curator`, `users`.`user_curator_dz`
-        FROM `users` 
-        WHERE `user_vk_id`= :student_id;
-    ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса для проверки пользователя');
+            SELECT `users`.`user_curator`, `users`.`user_curator_dz`
+            FROM `users` 
+            WHERE `user_vk_id`= :student_id;
+        ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса для проверки пользователя');
 
     // Выполнение запроса для проверки пользователя
     $stmt->execute(['student_id' => $in->studentId])
     or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса для проверки пользователя');
 
+    $stmt->rowCount() != 0 or $out->make_wrong_resp('Нет доступа (1)');
+
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // Проверка условий доступа
     if ($user['user_curator_dz'] != '' && $user['user_curator_dz'] != '0' && $user['user_curator_dz'] != $user_vk_id)
-        $out->make_wrong_resp('Нет доступа');
+        $out->make_wrong_resp('Нет доступа (2)');
 
     if (($user['user_curator_dz'] == '' || $user['user_curator_dz'] == '0') && $user['user_curator'] != $user_vk_id)
-        $out->make_wrong_resp('Нет доступа');
+        $out->make_wrong_resp('Нет доступа (3)');
 
     $stmt->closeCursor();
     unset($stmt);
@@ -65,50 +67,57 @@ if ($user_type != 'Админ') {
 // Валидация и приведение $in->dzNum к числу
 if (((string)(int)$in->dzNum) !== ((string)$in->dzNum) || (int)$in->dzNum < 0) {
     $out->make_wrong_resp('Параметр {dzNum} задан некорректно или отсутствует');
-} else {
-    $in->dzNum = (int)$in->dzNum;
 }
+
+$in->dzNum = (int)$in->dzNum;
 
 // Валидация и приведение $in->studentId к числу
 if (((string)(int)$in->studentId) !== ((string)$in->studentId) || (int)$in->studentId < 0) {
     $out->make_wrong_resp('Параметр {studentId} задан некорректно или отсутствует');
-} else {
-    $in->studentId = (int)$in->studentId;
 }
+
+$in->studentId = (int)$in->studentId;
 
 // Валидация и приведение $in->taskNum к числу
 if (((string)(int)$in->taskNum) !== ((string)$in->taskNum) || (int)$in->taskNum < 0) {
     $out->make_wrong_resp('Параметр {taskNum} задан некорректно или отсутствует');
-} else {
-    $in->taskNum = (int)$in->taskNum;
 }
+
+$in->taskNum = (int)$in->taskNum;
 
 // Валидация и приведение $in->taskStatus к числу
 if (((string)(int)$in->taskStatus) !== ((string)$in->taskStatus) || (int)$in->taskStatus < 0) {
     $out->make_wrong_resp('Параметр {taskStatus} задан некорректно или отсутствует');
-} else {
-    $in->taskStatus = (int)$in->taskStatus;
 }
 
-// ------------------------- Десериализация JSON -------------------------
+$in->taskStatus = (int)$in->taskStatus;
+
+// Валидация и десериализация $in->jsonData
+if (empty($in->jsonData)) {
+    $out->make_wrong_resp('Параметр {jsonData} отсутствует');
+}
+
 $curAnswer = json_decode($in->jsonData, true);
+if (!is_array($curAnswer)) {
+    $out->make_wrong_resp('Параметр {jsonData} задан некорректно');
+}
 
 // ------------------------- Обновление ДЗ -------------------------
 // Преобразование данных
-$teacherComment = $pdo->quote($curAnswer['cur_comment']);
-$userBall = $curAnswer['ballov'] === '' ? null : (int)$curAnswer['ballov'];
-$teacherJson = $pdo->quote(json_encode($curAnswer['add_comments'], JSON_UNESCAPED_UNICODE));
+$teacherComment = $curAnswer['cur_comment'];
+$userBall = $curAnswer['ballov'] === '' ? (int)null : (int)$curAnswer['ballov'];
+$teacherJson = json_encode($curAnswer['add_comments'], JSON_UNESCAPED_UNICODE);
 
 // Подготовка запроса на обновление ДЗ
 $query = "
     UPDATE `ht_user_p2` 
-    SET `is_checked` = '" . $in->taskStatus . "', 
-        `teacher_comment` = '" . $teacherComment . "', 
-        `teacher_json` = '" . $teacherJson . "', 
-        `user_ball` = '" . $userBall . "'
-    WHERE `user_id` = '" . $in->studentId . "'
-    AND `ht_number` = '" . $in->dzNum . "'
-    AND `q_number` = '" . $in->taskNum . "';
+    SET `is_checked` = " . $in->taskStatus . ", 
+        `teacher_comment` = " . $pdo->quote($teacherComment) . ", 
+        `teacher_json` = " . $pdo->quote($teacherJson) . ", 
+        `user_ball` = " . $userBall . "
+    WHERE `user_id` = " . $in->studentId . "
+    AND `ht_number` = " . $in->dzNum . "
+    AND `q_number` = " . $in->taskNum . ";
 ";
 
 // Выполнение запроса на обновление ДЗ
@@ -124,8 +133,8 @@ $stmt = $pdo->prepare("
         WHERE `ht_user_p2`.`user_id` = :student_id
         AND `ht_user_p2`.`ht_number` = :dz_num
     )
-	WHERE `ht_user`.`user_id` = :student_id
-	AND `ht_user`.`ht_number` = :dz_num 
+    WHERE `ht_user`.`user_id` = :student_id
+    AND `ht_user`.`ht_number` = :dz_num 
 ") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса на обновление баллов ученика');
 
 // Выполнение запроса на обновление баллов ученика
