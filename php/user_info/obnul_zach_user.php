@@ -27,6 +27,11 @@ try {
     $out->make_wrong_resp('Нет соединения с базой данных');
 }
 
+//Второе соединение с БД для функции отправки сообщений в ВК
+$mysqli = mysqli_init();
+$mysqli->real_connect(DB_HOST, DB_USER, DB_PASSWORD, DB_DATABASE_SOCEGE, NULL, NULL, DB_FLAGS) or $out->make_wrong_resp("Нет соединения с базой данных (2)");
+
+
 //---Проверка пользователя
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
 if(!in_array($user_type, ['Админ', 'Куратор'])) {
@@ -118,8 +123,6 @@ $stmt->closeCursor(); unset($stmt);
 $user = [$in->userVkId]; //Массив с одним пользователем, которому нужно отправить сообщение
 $message = "Добавлена попытка к автоматическому зачёту с номером {$in->zachId}";
 
-$mysqli = mysqli_init();
-$mysqli->real_connect(DB_HOST, DB_USER, DB_PASSWORD, DB_DATABASE_SOCEGE, NULL, NULL, DB_FLAGS) or $out->make_wrong_resp("Нет соединения с базой данных (2)");
 addTaskSendingToVk($mysqli, $user, $message)[0]['success'] or $out->make_wrong_resp('Ошибка отправки сообщения в ВК');
 
 $out->success = "1";
