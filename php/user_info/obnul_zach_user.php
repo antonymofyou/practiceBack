@@ -6,11 +6,11 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/config_api.inc.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 
 //---Класс запроса
-class UserInfoGetUserAutoZachets extends MainRequestClass {
+class UserInfoObnulZachUser extends MainRequestClass {
     public $userVkId = ''; // Идентификатор пользователя, чей зачёт надо обнулить
     public $zachId = ''; // Идентификатор зачёта для обнуления
 }
-$in = new UserInfoGetUserAutoZachets();
+$in = new UserInfoObnulZachUser();
 $in->from_json(file_get_contents('php://input'));
 
 //---Класс ответа
@@ -98,8 +98,9 @@ $stmt->execute([
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
 $stmt->closeCursor(); unset($stmt);
 
+
 //---Создание CRM комментария
-$comment = "Добавлена попыта пересдачи зачёта с ID {$in->zachId}";
+$comment = "Добавлена попытка пересдачи зачёта с ID {$in->zachId}";
 $stmt = $pdo->prepare("
     INSERT INTO `crm_comments`
     (`user_vk_id`, `crm_comment`, `crm_editor`, `crm_date`, `crm_time`)

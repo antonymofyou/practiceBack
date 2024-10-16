@@ -63,8 +63,8 @@ $stmt->closeCursor(); unset($stmt);
 
 //---Проверка пользователя(2)
 //Можно просматривать зачёты только своих учеников, админ может просматривать всех
-if($user_type != "Куратор" && $user['user_curator'] != $user_vk_id && !in_array($user_vk_id, user_info_lookers)) {
-    $out->make_wrong_resp('Ошибка доступа');
+if($user_type == "Куратор" && $user['user_curator'] != $user_vk_id && !in_array($user_vk_id, user_info_lookers)) {
+    $out->make_wrong_resp('Ошибка доступа (2)');
 }
 
 $stmt = $pdo->prepare("
