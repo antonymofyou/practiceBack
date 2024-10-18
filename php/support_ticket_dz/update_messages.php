@@ -63,13 +63,13 @@ $stmt->closeCursor(); unset($stmt);
 //--------------------------------Валидация $in->lastMessId
 if (((string) (int) $in->lastMessId) !== ((string) $in->lastMessId) || (int) $in->lastMessId <= 0) $out->make_wrong_resp("Параметр 'lastMessId' задан некорректно или отсутствует");
 $stmt = $pdo->prepare("SELECT `mess_id`
-    FROM `tickets_mess`
+    FROM `tickets_mess_dz`
     WHERE `mess_id` = :last_mess_id
 ;") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');
 $stmt->execute([
     'last_mess_id' => $in->lastMessId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
-if ($stmt->rowCount() == 0) $out->make_wrong_resp("Сообщение с ID {$in->lastMessId} не найдено");
+if ($stmt->rowCount() == 0) $out->make_wrong_resp("Сообщение с ID {$in->lastMessId} не найдена");
 $stmt->closeCursor(); unset($stmt);
 
 //--------------------------------Получение заявки
@@ -81,16 +81,18 @@ $stmt->execute([
     'ticket_id' => $in->ticketId
 ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (2)');
 if($stmt->rowCount() == 0) $out->make_wrong_resp("Ни одна заявка не была найдена [ID заявки: {$in->ticketId}] ");
-$ticket = $stmt->fetch(PDO::FETCH_ASSOC);
+$ticketDz = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
+$ticketDz = [
+	'userVkId' => (string) $ticketDz['user_vk_id'],
+];
 
 //--------------------------------Получение сообщений заявки
-$stmt = $pdo->prepare("SELECT `tickets_mess`.`mess_id`, `tickets_mess`.`ticket_id`, `tickets_mess`.`user_vk_id`, `tickets_mess`.`comment`, `tickets_mess`.`comment_dtime`, 
-	CONCAT(`users`.`user_name`,' ',`users`.`user_surname`) AS `mess_maker` 
-	FROM `tickets_mess` 
-	LEFT JOIN `users` ON `users`.`user_vk_id`=`tickets_mess`.`user_vk_id`
-	WHERE `tickets_mess`.`ticket_id`= :ticket_id AND `tickets_mess`.`mess_id`> :last_mess_id ORDER BY `tickets_mess`.`comment_dtime` ASC
+$stmt = $pdo->prepare("SELECT `tickets_mess_dz`.`mess_id`, `tickets_mess_dz`.`ticket_id`, `tickets_mess_dz`.`user_vk_id`, `tickets_mess_dz`.`comment`, 
+	`tickets_mess_dz`.`comment_dtime`, CONCAT(`users`.`user_name`,' ',`users`.`user_surname`) AS `mess_maker` FROM `tickets_mess_dz` 
+	LEFT JOIN `users` ON `users`.`user_vk_id`=`tickets_mess_dz`.`user_vk_id`
+	WHERE `tickets_mess_dz`.`ticket_id`=:ticket_id AND `tickets_mess_dz`.`mess_id`>:last_mess_id ORDER BY `comment_dtime` ASC
 ;") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (3)');
 $newMessagesQuery =$stmt->execute([
 	'ticket_id' => $in->ticketId,
@@ -101,10 +103,11 @@ $userRole = '';
 $lastMessId = '';
 
 while($newMessagesQuery = $stmt->fetch(PDO::FETCH_ASSOC)){
+	var_dump($newMessages);
 	if($newMessagesQuery['user_vk_id']==$user_vk_id){
 		$userRole="Вы";
 	}
-	else if($newMessagesQuery['user_vk_id']==$ticket['user_vk_id']){
+	else if($newMessagesQuery['user_vk_id']==$ticketDz['user_vk_id']){
 		$userRole="Создатель";
 	}
 	else if($newMessagesQuery['user_vk_id']==dz_answerer){
@@ -122,7 +125,18 @@ while($newMessagesQuery = $stmt->fetch(PDO::FETCH_ASSOC)){
 		"userVkId" => (string) $newMessagesQuery["user_vk_id"],
 	];
 	$lastMessId = $newMessagesQuery['mess_id'];
+	var_dump($newMessages);
 }
+$stmt->closeCursor(); unset($stmt);
+
+//--------------------------------Вставка данных в ticket_dz_user
+$stmt = $pdo->prepare("INSERT IGNORE INTO `ticket_dz_user` (`ticket_id`,`user_vk_id`) 
+	VALUES (:ticket_id, :user_vk_id)
+;") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (4)');
+$stmt->execute([
+	'ticket_id' => $in->ticketId,
+	'user_vk_id' => $user_vk_id,
+]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (4)');
 $stmt->closeCursor(); unset($stmt);
 
 //--------------------------------Формирование ответа
