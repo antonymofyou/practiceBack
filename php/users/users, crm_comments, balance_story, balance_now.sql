@@ -1,4 +1,4 @@
-CREATE TABLE `balance_now` (
+CREATE TABLE`balance_now` (
   `bn_user_id` bigint(20) UNSIGNED NOT NULL,
   `bn_balance` int(11) DEFAULT 0,
   `bn_last_date` date DEFAULT NULL,
@@ -67,13 +67,4 @@ CREATE TABLE `users` (
   KEY `ind_u_sur` (`user_surname`),
   KEY `ind_u_cur` (`user_curator`),
   KEY `apple_id_ind` (`apple_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-CREATE TABLE `users_add` (
-  `user_vk_id` bigint(20) UNSIGNED NOT NULL,
-  `user_goal_ball` smallint(6) DEFAULT NULL,
-  `user_goal_vuz` varchar(255) DEFAULT NULL,
-  `goal_budzhet` smallint(6) DEFAULT NULL,
-  `user_osobennosti` text DEFAULT NULL,
-  PRIMARY KEY (`user_vk_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
