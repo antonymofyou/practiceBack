@@ -40,22 +40,25 @@ if(!in_array($user_type, ['Админ', 'Куратор'])) {
 
 //---Валидация $in->userVkId
 if (((string) (int) $in->userVkId) !== ((string) $in->userVkId) || (int) $in->userVkId <= 0) $out->make_wrong_resp("Параметр 'userVkId' задан неверно или отсутствует");
-$stmt = $pdo->prepare("
-    SELECT `user_curator`
-    FROM `users`
-    WHERE `user_vk_id` = :userVkId;
-") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (1)");
-$stmt->execute([
-    'userVkId' => $in->userVkId
-]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
-if ($stmt->rowCount() == 0) $out->make_wrong_resp("Пользователь с ID {$in->userVkId} не найден");
-$user = $stmt->fetch(PDO::FETCH_ASSOC);
-$stmt->closeCursor(); unset($stmt);
+
 
 //---Проверка пользователя(2)
 //Можно обнулять зачёты только своих учеников, админ может обнулять всех
-if($user_type != "Куратор" && $user['user_curator'] != $user_vk_id) {
-    $out->make_wrong_resp('Ошибка доступа');
+if ($user_type == "Куратор") {
+    
+    $stmt = $pdo->prepare("
+        SELECT `user_curator`
+        FROM `users`
+        WHERE `user_vk_id` = :userVkId;
+    ") or $out->make_wrong_resp("Ошибка базы данных: подготовка запроса (1)");
+    $stmt->execute([
+        'userVkId' => $in->userVkId
+    ]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
+    if ($stmt->rowCount() == 0) $out->make_wrong_resp("Пользователь с ID {$in->userVkId} не найден");
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt->closeCursor(); unset($stmt);
+
+    if ($user['user_curator'] != $user_vk_id) $out->make_wrong_resp('Ошибка доступа (2)');
 }
 
 //---Валидация $in->zachId
@@ -74,7 +77,7 @@ $zachet = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt->closeCursor(); unset($stmt);
 
 //---Проверка на возможность обнуления
-if($zachet['zu_popitka'] != 3 || $zachet['zu_status'] != 'Несдан') $out->make_wrong_resp("Есть ещё попытки или зачёт сдан");
+if($zachet['zu_popitka'] >= 3 || $zachet['zu_status'] != 'Несдан') $out->make_wrong_resp("Есть ещё попытки или зачёт сдан");
 
 $stmt = $pdo->prepare("
     SELECT COUNT(*) AS `amount`
@@ -105,7 +108,7 @@ $stmt->closeCursor(); unset($stmt);
 
 
 //---Создание CRM комментария
-$comment = "Добавлена попытка пересдачи зачёта с ID {$in->zachId}";
+$comment = "Добавлены две попытки пересдачи зачёта с ID {$in->zachId}";
 $stmt = $pdo->prepare("
     INSERT INTO `crm_comments`
     (`user_vk_id`, `crm_comment`, `crm_editor`, `crm_date`, `crm_time`)
@@ -121,7 +124,7 @@ $stmt->closeCursor(); unset($stmt);
 
 //---Сообщение в ВК о добавлении попытки пересдачи
 $user = [$in->userVkId]; //Массив с одним пользователем, которому нужно отправить сообщение
-$message = "Добавлена попытка к автоматическому зачёту с номером {$in->zachId}";
+$message = "Добавлены две попытки пересдачи зачёта с номером {$in->zachId}";
 
 addTaskSendingToVk($mysqli, $user, $message)[0]['success'] or $out->make_wrong_resp('Ошибка отправки сообщения в ВК');
 
