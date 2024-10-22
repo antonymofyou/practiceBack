@@ -31,12 +31,24 @@ $out = new UserInfoGetUserZachetsAutoResp();
 
 //--------------------------------Подключение к базе данных
 
+
+
 try {
-    // Use PDO for the database connection
-    $pdo = new PDO("mysql:host=localhost;port=3366;dbname=task;charset=utf8mb4", 'root', 'zj8qz1sd6ruhqq24xaxlwq');
-} catch(PDOException $exception) {
+        $pdo = new PDO("mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_DATABASE_SOCEGE . ";charset=" . DB_CHARSET, DB_USER, DB_PASSWORD, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+       
+        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
+        PDO::MYSQL_ATTR_MULTI_STATEMENTS => false,
+    ]);
+}  catch (PDOException $exception) {
     $out->make_wrong_resp('Нет соединения с базой данных');
 }
+
+
+
+
+
+
 
 // Check user access 
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
