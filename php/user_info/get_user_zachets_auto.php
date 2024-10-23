@@ -45,17 +45,13 @@ try {
 require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/check_user.inc.php';
 
 //--------------------------------Валидация $in->userID
-if ($in->userId){
+if (((string) (int) $in->userId) !== ((string) $in->userId) || (int) $in->userId <= 0) $out->make_wrong_resp("Параметр 'userId' задан некорректно или отсутствует");
 $student_id = $in->userId;
-} 
-else{
-exit('не установлен пользователь ');
-}
+    
 
 //--------------------------------Проверка доступа
 if ($user_type != 'Админ' && $user_type != 'Куратор') {
     $out->make_wrong_resp('отказ в доступе');
-exit('отказ в доступе');
 }
 
 //получаем куратора
@@ -66,23 +62,23 @@ $stmt = $pdo->prepare(
 $stmt->execute(['user_vk_id'=>$student_id]) or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
 
 if ($stmt->rowCount() ==0){
-    exit('такого пользователя нету');
+    $out->make_wrong_resp('такого пользователя нету');
 }
 $userCurator = $stmt->fetch(PDO::FETCH_ASSOC);  
 $stmt->closeCursor();
 unset($stmt);
 
-if ($user_type =='Куратор' && $fetchedQuery['user_curator']  != $in->userId) exit('это не твой ученик');
+if ($user_type =='Куратор' && $fetchedQuery['user_curator']  != $in->userId) $out->make_wrong_resp('это не твой ученик');
 
 
 
-$stmt = $pdo->prepare(
-"SELECT `zachets_auto`.*, `zachet_user`.`zu_status`, `zachet_user`.`zu_popitka`, `zachet_user`.`zu_errors`, `zachet_user`.`zu_errors`  FROM `zachets_auto` 
-LEFT JOIN `zachet_user` ON `zachet_user`.`zachet_id`=`zachets_auto`.`za_id` AND `zachet_user`.`user_id`=:student_id
-WHERE `za_showed`=1
-ORDER BY `za_id` DESC;
-"
-) or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');;
+$stmt = $pdo->prepare("
+    SELECT `zachets_auto` .`za_id` , zachets_auto.`za_date_start` , zachets_auto.`za_deadline` , zachets_auto.`za_max_time` , zachets_auto.`za_max_popitok` , zachets_auto.`za_questions`, zachets_auto.`za_max_errors` , zachets_auto.`za_lesson_numbers` , zachets_auto.`za_showed`, zachet_user.`zu_status`,  zachet_user.`zu_popitka` 
+    FROM `zachets_auto` 
+    LEFT JOIN `zachet_user` ON `zachet_user`.`zachet_id`=`zachets_auto`.`za_id` AND `zachet_user`.`user_id` = :student_id 
+    WHERE `za_showed` = 1 
+    ORDER BY `za_id` DESC;
+") or $out->make_wrong_resp('Ошибка базы данных: подготовка запроса (1)');;
 $stmt->execute(['student_id' => $student_id])  or $out->make_wrong_resp('Ошибка базы данных: выполнение запроса (1)');
 if ($stmt->rowCount() == 0) $out->make_wrong_resp("зачет ч.1 с ID {$in->userId} не найден");
 $zachets = $stmt->fetchAll(PDO::FETCH_ASSOC);
