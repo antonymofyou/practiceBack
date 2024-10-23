@@ -8,8 +8,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/app/api/includes/root_classes.inc.php';
 // класс запроса
 class UserInfoGetUserZachetsAuto extends MainRequestClass {
      // идентификатор вопроса ч.1, данные которого нужно получить
+    public $userId = '';
 }
-$link=mysqli_init();
 $in = new UserInfoGetUserZachetsAuto();
 $in->from_json(file_get_contents('php://input'));
 
